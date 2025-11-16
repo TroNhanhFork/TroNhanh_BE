@@ -42,7 +42,6 @@ const server = http.createServer(app);
 //     console.log('User disconnected');
 //   });
 // });
-// app.use(cors()); //Share tai nguyen giua cac cong khac nhau
 
 // --- Socket.IO setup ---
 const onlineUsers = new Map();
@@ -58,7 +57,12 @@ const io = new Server(server, {
   pingInterval: 20000,
 });
 
-app.use(cors());
+// Configure CORS for express to accept requests from the front-end and allow credentials
+// (important when FE sends fetch(..., { credentials: 'include' }))
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
@@ -280,7 +284,7 @@ app.get("/api/payment/webhook", (req, res) => {
   console.log("!!!!!!!!!! BẮT ĐƯỢC REQUEST GET XÁC THỰC !!!!!!!!!!");
   res.status(200).json({ message: "DEBUG SUCCESS: GET request received!" });
 });
-app.post("/api/payment/webhook",  express.raw({ type: "application/json" }), handlePayOSWebhook);
+app.post("/api/payment/webhook", express.raw({ type: "application/json" }), handlePayOSWebhook);
 // app.post("/api/payment/webhook", express.raw({ type: "application/json" }), (req, res, next) => {
 //   console.log("📥 Webhook route HIT!");
 //   next();
@@ -408,6 +412,10 @@ app.use("/api/rooms", roomRoutes);
 // Contract routes
 const contractRoutes = require("./src/routes/contractRoutes");
 app.use("/api/contracts", contractRoutes);
+
+// AI Contract Generator routes
+const aiContractRoutes = require('./src/routes/aiContractRoutes');
+app.use('/api/ai', aiContractRoutes);
 
 // Booking routes
 const bookingRoutes = require("./src/routes/bookingRoutes");

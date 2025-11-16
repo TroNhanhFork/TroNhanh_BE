@@ -26,4 +26,23 @@ const chatWithAIStreaming = async (message, onChunk, model = "gemini-2.5-flash")
   }
 };
 
-module.exports = { chatWithAIStreaming };
+/**
+ * Buffer a streamed response from Gemini into a single string and return it.
+ * @param {string} prompt
+ * @param {string} model
+ * @returns {Promise<string>}
+ */
+const generateDescriptionFromPrompt = async (prompt, model = "gemini-2.5-flash") => {
+  try {
+    let text = "";
+    await chatWithAIStreaming(prompt, (chunk) => {
+      text += chunk;
+    }, model);
+    return text;
+  } catch (err) {
+    console.error("Error in generateDescriptionFromPrompt:", err);
+    throw err;
+  }
+};
+
+module.exports = { chatWithAIStreaming, generateDescriptionFromPrompt };
