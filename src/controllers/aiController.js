@@ -60,19 +60,22 @@ Yêu cầu:
 
 Hãy viết mô tả:`;
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyD2GrsL_-3A0tlHSj4YzOVHHgLIxVIZHqs';
-    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1/models/text-bison-001:generateText?key=${GEMINI_API_KEY}`;
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY không được cấu hình trong .env');
+    }
+
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const response = await axios.post(
       GEMINI_API_URL,
       {
-        prompt: {
-          text: prompt
-        },
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 512
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }]
       },
       {
         headers: {
@@ -83,7 +86,9 @@ Hãy viết mô tả:`;
 
     const candidates = response.data?.candidates;
     if (candidates && candidates.length > 0) {
-      const output = candidates[0].output || candidates[0].content?.[0]?.text || candidates[0].content?.parts?.[0]?.text;
+      const content = candidates[0]?.content;
+      const output = content?.parts?.[0]?.text;
+      
       if (output) {
         return res.status(200).json({ description: output.trim() });
       }
