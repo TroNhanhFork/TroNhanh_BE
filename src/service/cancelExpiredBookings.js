@@ -6,7 +6,7 @@ const Room = require("../models/Room"); // ✅ Import Room model
 const EXPIRATION_TIME = parseInt(process.env.BOOKING_EXPIRATION_TIME_MS || 15 * 60 * 1000); // Lấy từ biến môi trường hoặc mặc định
 
 // Cron job chạy mỗi phút
-cron.schedule("* * * * *", async () => {
+cron.schedule("0 * * * *", async () => {
   const now = new Date();
   console.log(`\n🕒 [${now.toLocaleTimeString("vi-VN")}] Running Booking Expiry Check...`);
 
@@ -68,4 +68,4 @@ cron.schedule("* * * * *", async () => {
   }
 });
 
-console.log("✅ Booking expiry cron job started (runs every 1 minute)");
+console.log("✅ Booking expiry cron job started (chạy mỗi đầu giờ)");
