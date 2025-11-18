@@ -1,26 +1,18 @@
-/**
- * Image Optimization Service using Tinify API
- * Compresses and optimizes uploaded images
- */
-
 const tinify = require('tinify');
 const fs = require('fs').promises;
 const path = require('path');
 
 // Initialize Tinify with API key
-tinify.key = process.env.TINIFY_API_KEY;
+if (process.env.TINIFY_API_KEY) {
+  tinify.key = process.env.TINIFY_API_KEY;
+}
 
-/**
- * Compress and optimize an image using Tinify
- * @param {string} inputPath - Path to original image
- * @param {string} outputPath - Path to save optimized image (optional, defaults to overwrite)
- * @param {Object} options - Optimization options
- * @returns {Promise<Object>} - Optimization result
- */
 const optimizeImage = async (inputPath, outputPath = null, options = {}) => {
+  console.log(`[Image Optimizer] Starting optimization for: ${inputPath}`);
   try {
     // Validate API key is set
     if (!tinify.key) {
+       console.error('[Image Optimizer] FATAL: TINIFY_API_KEY is not configured in the .env file. Please obtain a free key from https://tinypng.com/developers and add it to your .env file to proceed.');
       throw new Error('TINIFY_API_KEY is not configured');
     }
 
@@ -32,7 +24,7 @@ const optimizeImage = async (inputPath, outputPath = null, options = {}) => {
 
     // Compress the image
     const source = tinify.fromFile(inputPath);
-    
+
     // Apply resize if specified
     let optimized = source;
     if (options.resize) {
@@ -61,6 +53,8 @@ const optimizeImage = async (inputPath, outputPath = null, options = {}) => {
     // Get compression count (API usage tracking)
     const compressionCount = tinify.compressionCount;
 
+    console.log(`[Image Optimizer] Successfully optimized ${inputPath}. Saved ${originalSize - compressedSize} bytes (${compressionRatio}%). API usage this month: ${compressionCount}.`);
+
     return {
       success: true,
       originalSize,
@@ -73,20 +67,20 @@ const optimizeImage = async (inputPath, outputPath = null, options = {}) => {
     };
 
   } catch (error) {
-    console.error('[IMAGE OPTIMIZATION ERROR]', error);
-    
+    console.error(`[IMAGE OPTIMIZATION ERROR] Failed to process image: ${inputPath}`, error);
+
     // Handle specific Tinify errors
     if (error instanceof tinify.AccountError) {
-      throw new Error('Tinify API key verification failed or account issue');
+      throw new Error(`Tinify API key verification failed or account issue for ${inputPath}`);
     } else if (error instanceof tinify.ClientError) {
-      throw new Error('Invalid image or request to Tinify');
+      throw new Error(`Invalid image or request to Tinify for ${inputPath}`);
     } else if (error instanceof tinify.ServerError) {
-      throw new Error('Tinify server error, please try again');
+      throw new Error(`Tinify server error, please try again for ${inputPath}`);
     } else if (error instanceof tinify.ConnectionError) {
-      throw new Error('Network connection error with Tinify');
+      throw new Error(`Network connection error with Tinify for ${inputPath}`);
     }
-    
-    throw new Error(`Failed to optimize image: ${error.message}`);
+
+    throw new Error(`Failed to optimize image ${inputPath}: ${error.message}`);
   }
 };
 
@@ -96,10 +90,17 @@ const optimizeImage = async (inputPath, outputPath = null, options = {}) => {
  * @returns {Promise<Array>}
  */
 const batchOptimizeImages = async (images) => {
+  console.log(`[Image Optimizer] Starting batch optimization for ${images.length} images.`);
   try {
     const results = await Promise.allSettled(
       images.map(img => optimizeImage(img.inputPath, img.outputPath, img.options || {}))
     );
+
+    results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+            console.error(`[Image Optimizer] Batch failure for image: ${images[index].inputPath}. Reason: ${result.reason.message}`);
+        }
+    });
 
     return results.map((result, index) => ({
       inputPath: images[index].inputPath,

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon index.js",
+    "start": "nodemon app.js",
     "dev": "nodemon app.js"
   },
   "repository": {
@@ -20,10 +20,9 @@
   },
   "homepage": "https://github.com/TroNhanhProject/TroNhanh_BE#readme",
   "dependencies": {
+    "@google-cloud/vision": "^4.3.2",
     "@google/generative-ai": "^0.24.1",
     "@payos/node": "^2.0.3",
-    "@google-cloud/vision": "^4.3.2",
-    "tinify": "^1.7.1",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
@@ -46,6 +45,7 @@
     "openai": "^5.20.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.1",
     "tinify": "^1.8.2"
   }
