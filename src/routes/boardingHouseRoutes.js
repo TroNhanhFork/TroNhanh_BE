@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const boardingHouseController = require("../controllers/boardingHouseController");
 const uploadAccommodation = require("../middleware/accommodationUpload");
+const { validateUploadedImages, optimizeUploadedImages } = require("../middleware/imageValidation");
 const searchAc = require("../controllers/searchAccomodation");
 const authMiddleware = require('../middleware/authMiddleWare');
 
@@ -39,6 +40,8 @@ router.post(
     { name: "photos", maxCount: 10 },
     { name: "files", maxCount: 50 },
   ]),
+  validateUploadedImages,      // AI moderation
+  optimizeUploadedImages,       // Image optimization
   boardingHouseController.createBoardingHouse
 );
 
@@ -48,6 +51,8 @@ router.put(
     { name: "photos", maxCount: 10 },
     { name: "files", maxCount: 50 },
   ]),
+  validateUploadedImages,      // AI moderation
+  optimizeUploadedImages,       // Image optimization
   boardingHouseController.updateBoardingHouse
 );
 

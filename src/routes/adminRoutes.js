@@ -37,6 +37,17 @@ const {
 } = require('../controllers/AdminController/ReportController');
 
 const {
+  getFlaggedImages,
+  getFlaggedImageById,
+  approveFlaggedImage,
+  rejectFlaggedImage,
+  deleteFlaggedImage,
+  getFlaggedImageStats,
+  batchApprove,
+  batchReject
+} = require('../controllers/AdminController/imageModerationController');
+
+const {
   getUserDashboard,
   getAccommodationDashboard,
   getReportDashboard,
@@ -103,5 +114,15 @@ router.get('/reports', getAllReports);                               // GET /api
 router.get('/reports/stats', getReportStats);                        // GET /api/admin/reports/stats
 router.get('/reports/:id', getReportById);                           // GET /api/admin/reports/:id
 router.put('/reports/:id/resolve', resolveReport);                   // PUT /api/admin/reports/:id/resolve
+
+// UC-Admin-ImageModeration: AI Image Moderation & Review
+router.get('/flagged-images/stats', getFlaggedImageStats);           // GET /api/admin/flagged-images/stats
+router.get('/flagged-images', getFlaggedImages);                     // GET /api/admin/flagged-images
+router.get('/flagged-images/:id', getFlaggedImageById);              // GET /api/admin/flagged-images/:id
+router.put('/flagged-images/:id/approve', approveFlaggedImage);      // PUT /api/admin/flagged-images/:id/approve
+router.put('/flagged-images/:id/reject', rejectFlaggedImage);        // PUT /api/admin/flagged-images/:id/reject
+router.delete('/flagged-images/:id', deleteFlaggedImage);            // DELETE /api/admin/flagged-images/:id
+router.post('/flagged-images/batch-approve', batchApprove);          // POST /api/admin/flagged-images/batch-approve
+router.post('/flagged-images/batch-reject', batchReject);            // POST /api/admin/flagged-images/batch-reject
 
 module.exports = router;
