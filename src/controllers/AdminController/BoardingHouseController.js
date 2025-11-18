@@ -127,12 +127,10 @@ exports.deleteBoardingHouseAdmin = async (req, res) => {
             return res.status(400).json({ message: 'Post has already been deleted.' });
         }
 
-        // ✅ Logic kiểm tra mới: Cấm xóa nếu có bất kỳ phòng nào đang được thuê
         const bookedRoom = await Room.findOne({ 
             boardingHouseId: house._id,
             status: 'Booked' 
         });
-
         if (bookedRoom) {
             return res.status(400).json({
                 message: 'Cannot delete this boarding house as it has currently rented rooms. Please resolve the bookings first.'
@@ -140,21 +138,27 @@ exports.deleteBoardingHouseAdmin = async (req, res) => {
         }
 
         house.approvedStatus = 'deleted';
-        house.deletedReason = reason; // ✅ Giả sử bạn có trường này trong model
-        await house.save();
-        
-        // Log the action
-        await AuditLog.create({
-            adminId: req.user?._id,
-            action: 'delete_boarding_house',
-            targetBoardingHouseId: house._id, // ✅ Đổi tên cho rõ ràng
-            description: `Deleted by admin. Reason: ${reason}`,
-            timestamp: new Date()
-        });
+        house.deletedReason = reason;
+        await house.save(); // ✅ Soft delete thành công
 
+        // ✅ Audit log: riêng try/catch để không block client
+        try {
+            await AuditLog.create({
+                adminId: req.user?._id,
+                action: 'delete_boarding_house',
+                targetBoardingHouseId: house._id,
+                description: `Deleted by admin. Reason: ${reason}`,
+                timestamp: new Date()
+            });
+        } catch (auditErr) {
+            console.error('[AUDIT LOG ERROR]', auditErr);
+        }
+
+        // ✅ Trả về 200 ngay cả khi audit log fail
         res.status(200).json({ message: 'Boarding house post deleted (soft delete).', data: house });
+
     } catch (err) {
         console.error('[ADMIN DELETE BOARDING_HOUSE ERROR]', err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 };

@@ -192,7 +192,7 @@ exports.getAllBoardingHouses = async (req, res) => {
                     availableRoomsCount: { $size: { $filter: { input: '$rooms', as: 'room', cond: { $eq: ['$$room.status', 'Available'] } } } },
                     minPrice: { $min: '$rooms.price' },
                     maxPrice: { $max: '$rooms.price' },
-                    minArea: { $min: "$rooms.area" }, 
+                    minArea: { $min: "$rooms.area" },
                     maxArea: { $max: "$rooms.area" },
                     totalRooms: { $size: '$rooms' }
                 }
@@ -298,32 +298,58 @@ exports.getBoardingHouseById = async (req, res) => {
  * @route DELETE /api/boarding-houses/:id
  */
 exports.deleteBoardingHouse = async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
     try {
         const houseId = req.params.id;
 
-        const bookedRoom = await Room.findOne({ boardingHouseId: houseId, status: "Booked" });
+        console.log("👉 DELETE request for houseId:", houseId);
+
+        // 1. Kiểm tra phòng đang được đặt
+        const bookedRoom = await Room.findOne({
+            boardingHouseId: houseId,
+            status: "Booked"
+        });
+
+        console.log("👉 bookedRoom:", bookedRoom);
+
         if (bookedRoom) {
-            await session.abortTransaction();
-            return res.status(400).json({ message: "Không thể xóa nhà trọ này vì đang có phòng được khách hàng đặt!" });
+            return res.status(400).json({
+                message: "Không thể xóa nhà trọ này vì đang có phòng được khách hàng đặt!"
+            });
         }
 
-        await Review.deleteMany({ boardingHouseId: houseId }, { session });
-        await Room.deleteMany({ boardingHouseId: houseId }, { session });
-        const deletedHouse = await BoardingHouse.findByIdAndDelete(houseId, { session });
-        if (!deletedHouse) throw new Error("Không tìm thấy nhà trọ để xóa.");
+        // 2. Xóa review
+        console.log("👉 Deleting reviews...");
+        await Review.deleteMany({ boardingHouseId: houseId });
 
-        await session.commitTransaction();
-        res.status(200).json({ message: "Xóa nhà trọ và tất cả các phòng thành công" });
+        // 3. Xóa rooms
+        console.log("👉 Deleting rooms...");
+        await Room.deleteMany({ boardingHouseId: houseId });
+
+        // 4. Xóa boarding house
+        console.log("👉 Deleting house...");
+        const deletedHouse = await BoardingHouse.deleteOne({ _id: houseId });
+
+        if (deletedHouse.deletedCount === 0) {
+            return res.status(404).json({
+                message: "Không tìm thấy nhà trọ để xóa."
+            });
+        }
+
+        res.status(200).json({
+            message: "Xóa nhà trọ và tất cả các phòng thành công"
+        });
+
     } catch (err) {
-        await session.abortTransaction();
         console.error("[DELETE BOARDING HOUSE ERROR]", err);
-        res.status(500).json({ message: "Server error" });
-    } finally {
-        session.endSession();
+        res.status(500).json({
+            message: "Server error",
+            error: err.message
+        });
     }
 };
+
+
+
 
 // ================================================================
 // SECTION: QUẢN LÝ ĐÁNH GIÁ (REVIEW)
