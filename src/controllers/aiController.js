@@ -2,6 +2,7 @@ const { chatWithAIStreaming } = require("../service/aiService");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const fetch = require("node-fetch");
+const { buildAIContext } = require("../controllers/aiDataController");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -11,9 +12,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 exports.chat = async (req, res) => {
   const { message } = req.body;
   const user = req.user;
-console.log("User info:", req.user);
-const role = req.user?.role || "guest";
-console.log("Determined role:", role);
+  console.log("User info:", req.user);
+  const role = req.user?.role || "guest";
+  console.log("Determined role:", role);
 
   if (!message) return res.status(400).send("Message is required");
 
@@ -23,7 +24,7 @@ console.log("Determined role:", role);
   try {
     // 🧠 Tách phần xử lý dữ liệu sang aiDataController
     const promptContext = await buildAIContext(role, user, message);
-const systemRule = `
+    const systemRule = `
 Bạn là AI của hệ thống Trọ Nhanh.
 Bạn *tuyệt đối không được bịa*.
 Chỉ trả lời dựa trên dữ liệu được truyền vào.
@@ -155,7 +156,7 @@ exports.nearbyPlaces = async (req, res) => {
   if (!lat || !lng || !keyword) return res.json([]);
 
   try {
-    const apiKey = process.env.GEOAPIFY_KEY; 
+    const apiKey = process.env.GEOAPIFY_KEY;
     const url = `https://api.geoapify.com/v2/places?categories=${encodeURIComponent(
       keyword
     )}&filter=circle:${lng},${lat},20000&limit=20&apiKey=${apiKey}`;
