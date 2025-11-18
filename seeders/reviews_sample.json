@@ -1,0 +1,20 @@
+[
+  {
+    "_id": { "$oid": "658000000000000000000301" },
+    "boardingHouseId": { "$oid": "654000000000000000000001" },
+    "customerId": { "$oid": "68f4e941fe36ba7fe694bcac" },
+    "roomId": { "$oid": "655000000000000000000012" },
+    "rating": 5,
+    "comment": "Rất hài lòng, chủ nhà thân thiện.",
+    "createdAt": { "$date": "2025-10-10T12:00:00Z" }
+  },
+  {
+    "_id": { "$oid": "658000000000000000000302" },
+    "boardingHouseId": { "$oid": "654000000000000000000003" },
+    "customerId": { "$oid": "68f4e941fe36ba7fe694bcac" },
+    "roomId": { "$oid": "655000000000000000000014" },
+    "rating": 4,
+    "comment": "Phòng đẹp, hơi xa trung tâm.",
+    "createdAt": { "$date": "2025-09-10T12:00:00Z" }
+  }
+]

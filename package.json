@@ -4,7 +4,7 @@
   "description": "Up code Back-end in here",
   "main": "index.js",
   "scripts": {
-    "test": "jest --runInBand",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon index.js",
     "dev": "nodemon app.js"
   },
@@ -44,7 +44,7 @@
     "openai": "^5.20.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "pdfkit": "^0.17.2",
+    "socket.io": "^4.8.1"
   }
 }

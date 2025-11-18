@@ -1,33 +1,41 @@
+// models/VisitRequest.js
+const mongoose = require('mongoose');
 
-const mongoose = require("mongoose");
-
-const VisitRequestSchema = new mongoose.Schema({
+const visitRequestSchema = new mongoose.Schema({
   boardingHouseId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "BoardingHouse",
-    required: true,
+    ref: 'BoardingHouse', 
+    required: true
   },
-  customerId: {
+  customerId: { 
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
+    ref: 'User', 
+    required: true
   },
-  ownerId: {
+  ownerId: { // Chủ nhà
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
+    ref: 'User', 
+    required: true
   },
-  requestedDateTime: {
+  requestedDateTime: { 
     type: Date,
-    required: true,
+    required: true
   },
-  message: String,
-  ownerNotes: String,
+  message: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
   status: {
     type: String,
-    enum: ["pending", "confirmed", "rejected"],
-    default: "pending",
+    enum: ['pending', 'confirmed', 'rejected'],
+    default: 'pending'
   },
-}, { timestamps: true });
+  ownerNotes: { 
+    type: String,
+    trim: true,
+    maxlength: 500
+  }
+}, { timestamps: true }); 
 
-module.exports = mongoose.model("VisitRequest", VisitRequestSchema);
+module.exports = mongoose.model('VisitRequest', visitRequestSchema);

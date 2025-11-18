@@ -14,7 +14,7 @@ exports.getUserDashboard = async (req, res) => {
     startDate.setDate(startDate.getDate() - days);
 
     const userStats = await getUserStatistics(startDate, true); // detailed = true
-    
+
     res.status(200).json({
       success: true,
       data: userStats,
@@ -35,12 +35,12 @@ exports.getUserDashboard = async (req, res) => {
 async function getUserStatistics(startDate, detailed = false) {
   const total = await User.countDocuments();
   const newUsers = await User.countDocuments({ createdAt: { $gte: startDate } });
-  
+
   // 1. User counts by role and status
   const customerCount = await User.countDocuments({ role: 'customer' });
   const ownerCount = await User.countDocuments({ role: 'owner' });
   const blockedCount = await User.countDocuments({ status: 'locked' });
-  
+
   const roleBreakdown = await User.aggregate([
     { $group: { _id: '$role', count: { $sum: 1 } } }
   ]);
@@ -55,7 +55,7 @@ async function getUserStatistics(startDate, detailed = false) {
 
   let dailyRegistrations = [];
   let topUsers = [];
-  
+
   if (detailed) {
     // Daily registration trend
     dailyRegistrations = await User.aggregate([
@@ -139,7 +139,7 @@ exports.getAccommodationDashboard = async (req, res) => {
     startDate.setDate(startDate.getDate() - days);
 
     const accommodationStats = await getAccommodationStatistics(startDate);
-    
+
     res.status(200).json({
       success: true,
       data: accommodationStats,
@@ -160,7 +160,7 @@ exports.getAccommodationDashboard = async (req, res) => {
 async function getAccommodationStatistics(startDate) {
   const total = await Accommodation.countDocuments();
   const newAccommodations = await Accommodation.countDocuments({ createdAt: { $gte: startDate } });
-  
+
   const statusBreakdown = await Accommodation.aggregate([
     { $group: { _id: '$status', count: { $sum: 1 } } }
   ]);
@@ -243,7 +243,7 @@ async function getAccommodationStatistics(startDate) {
     }
   ]);
 
-  const occupancyRate = occupancyStats[0] 
+  const occupancyRate = occupancyStats[0]
     ? ((occupancyStats[0].occupiedAccommodations / occupancyStats[0].totalAccommodations) * 100).toFixed(2)
     : 0;
 
@@ -280,7 +280,7 @@ exports.getReportDashboard = async (req, res) => {
     startDate.setDate(startDate.getDate() - days);
 
     const reportStats = await getReportStatistics(startDate);
-    
+
     res.status(200).json({
       success: true,
       data: reportStats,
@@ -361,7 +361,7 @@ async function getReportStatistics(startDate) {
   reportsByUserType.forEach(item => {
     const count = item.count;
     const status = item._id.status;
-    
+
     // Owner reports (owner reporting customer)
     if (item._id.reporterRole === 'owner' && item._id.reportedUserRole === 'customer') {
       ownerReports.total += count;
@@ -369,7 +369,7 @@ async function getReportStatistics(startDate) {
       else if (status === 'Approved') ownerReports.approved += count;
       else if (status === 'Rejected') ownerReports.rejected += count;
     }
-    
+
     // Customer reports (customer reporting owner)
     if (item._id.reporterRole === 'customer' && item._id.reportedUserRole === 'owner') {
       customerReports.total += count;
@@ -412,7 +412,7 @@ exports.getMembershipDashboard = async (req, res) => {
     startDate.setDate(startDate.getDate() - days);
 
     const membershipStats = await getMembershipStatistics(startDate);
-    
+
     res.status(200).json({
       success: true,
       data: membershipStats,
@@ -432,11 +432,11 @@ exports.getMembershipDashboard = async (req, res) => {
 // Helper function: Get membership statistics
 async function getMembershipStatistics(startDate) {
   const totalPackages = await MembershipPackage.countDocuments({ isDeleted: { $ne: true } });
-  
+
   // 5. Package with most owner purchases
   const packagePopularity = await Payment.aggregate([
-    { 
-      $match: { 
+    {
+      $match: {
         status: 'success',
         membershipPackageId: { $exists: true, $ne: null }
       }
@@ -477,11 +477,11 @@ async function getMembershipStatistics(startDate) {
   ]);
 
   // Total purchases - count all successful payments in database
-  const totalPurchases = await Payment.countDocuments({ 
+  const totalPurchases = await Payment.countDocuments({
     status: 'Paid'
   });
 
-  const recentPurchases = await Payment.countDocuments({ 
+  const recentPurchases = await Payment.countDocuments({
     status: 'success',
     membershipPackageId: { $exists: true, $ne: null },
     createdAt: { $gte: startDate }
@@ -515,7 +515,7 @@ exports.getFinancialDashboard = async (req, res) => {
     startDate.setDate(startDate.getDate() - days);
 
     const financialStats = await getTransactionStatistics(startDate, true); // detailed = true
-    
+
     res.status(200).json({
       success: true,
       data: financialStats,
@@ -534,11 +534,20 @@ exports.getFinancialDashboard = async (req, res) => {
 
 // Helper function: Get transaction statistics for column chart display
 async function getTransactionStatistics(startDate, detailed = false) {
-  const totalTransactions = await Payment.countDocuments();
-  const recentTransactions = await Payment.countDocuments({ createAt: { $gte: startDate } });
+  const baseMatch = {
+    status: { $in: ['success', 'Paid'] },
+    membershipPackageId: { $ne: null },
+    bookingId: { $eq: null }
+  };
+
+  const totalTransactions = await Payment.countDocuments(baseMatch);
+  const recentTransactions = await Payment.countDocuments({
+    ...baseMatch,
+    createAt: { $gte: startDate }
+  });
 
   const revenueStats = await Payment.aggregate([
-    { $match: { status: { $in: ['success', 'Paid'] } } },
+    { $match: baseMatch },
     {
       $group: {
         _id: null,
@@ -549,11 +558,8 @@ async function getTransactionStatistics(startDate, detailed = false) {
   ]);
 
   const recentRevenue = await Payment.aggregate([
-    { 
-      $match: { 
-        status: { $in: ['success', 'Paid'] },
-        createAt: { $gte: startDate }
-      }
+    {
+      $match: { ...baseMatch, createAt: { $gte: startDate } },
     },
     {
       $group: {
@@ -563,19 +569,13 @@ async function getTransactionStatistics(startDate, detailed = false) {
     }
   ]);
 
-  // Status breakdown for pie/donut chart
   const statusBreakdown = await Payment.aggregate([
+    { $match: baseMatch },
     { $group: { _id: '$status', count: { $sum: 1 }, revenue: { $sum: '$amount' } } }
   ]);
 
-  // Column Chart Data: Daily Revenue (based on period parameter)
   const dailyRevenueChart = await Payment.aggregate([
-    { 
-      $match: { 
-        status: { $in: ['success', 'Paid'] },
-        createAt: { $gte: startDate }
-      }
-    },
+    { $match: { ...baseMatch, createAt: { $gte: startDate } } },
     {
       $group: {
         _id: {
@@ -590,8 +590,8 @@ async function getTransactionStatistics(startDate, detailed = false) {
     { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
   ]);
 
-  // Column Chart Data: Revenue by Payment Status
   const statusRevenueChart = await Payment.aggregate([
+    { $match: baseMatch },
     {
       $group: {
         _id: '$status',
@@ -603,16 +603,10 @@ async function getTransactionStatistics(startDate, detailed = false) {
   ]);
 
   let membershipRevenueChart = [];
-  
+
   if (detailed) {
-    // Column Chart Data: Revenue by Membership Packages
     membershipRevenueChart = await Payment.aggregate([
-      { 
-        $match: { 
-          status: { $in: ['success', 'Paid'] },
-          membershipPackageId: { $exists: true }
-        }
-      },
+      { $match: baseMatch },
       {
         $lookup: {
           from: 'membershippackages',
@@ -633,20 +627,20 @@ async function getTransactionStatistics(startDate, detailed = false) {
     ]);
   }
 
-  // Format data for daily revenue list
+  // ✅ Format lại data trả về
   return {
-    // Summary metrics
     summary: {
       totalTransactions,
       recentTransactions,
       totalRevenue: revenueStats[0]?.totalRevenue || 0,
       recentRevenue: recentRevenue[0]?.recentRevenue || 0,
       averageTransaction: revenueStats[0]?.averageTransaction || 0,
-      growthRate: revenueStats[0]?.totalRevenue > 0 ? 
-        (((recentRevenue[0]?.recentRevenue || 0) / revenueStats[0].totalRevenue) * 100).toFixed(2) : 0
+      growthRate:
+        revenueStats[0]?.totalRevenue > 0
+          ? (((recentRevenue[0]?.recentRevenue || 0) / revenueStats[0].totalRevenue) * 100).toFixed(2)
+          : 0,
     },
 
-    // Daily Revenue List
     dailyRevenueList: dailyRevenueChart.map(item => ({
       date: `${String(item._id.day).padStart(2, '0')}/${String(item._id.month).padStart(2, '0')}/${item._id.year}`,
       dayOfWeek: new Date(item._id.year, item._id.month - 1, item._id.day).toLocaleDateString('us-US', { weekday: 'long' }),
@@ -655,53 +649,32 @@ async function getTransactionStatistics(startDate, detailed = false) {
       averagePerTransaction: item.transactions > 0 ? (item.revenue / item.transactions).toFixed(0) : 0
     })),
 
-    // Additional breakdown charts
     charts: {
-
-      // Payment Status Revenue Column Chart
       statusRevenue: {
         type: 'column',
         title: 'Revenue by Payment Status',
         categories: statusRevenueChart.map(item => item._id || 'Unknown'),
         series: [
-          {
-            name: 'Revenue (VND)',
-            data: statusRevenueChart.map(item => item.revenue)
-          },
-          {
-            name: 'Transaction Count',
-            data: statusRevenueChart.map(item => item.count)
-          }
+          { name: 'Revenue (VND)', data: statusRevenueChart.map(item => item.revenue) },
+          { name: 'Transaction Count', data: statusRevenueChart.map(item => item.count) },
         ]
       },
-
-      // Membership Revenue Column Chart (if detailed)
       ...(detailed && {
         membershipRevenue: {
           type: 'column',
           title: 'Revenue by Membership Package',
           categories: membershipRevenueChart.map(item => item.packageName || 'Unknown Package'),
           series: [
-            {
-              name: 'Revenue (VND)',
-              data: membershipRevenueChart.map(item => item.revenue)
-            },
-            {
-              name: 'Purchases',
-              data: membershipRevenueChart.map(item => item.transactions)
-            }
+            { name: 'Revenue (VND)', data: membershipRevenueChart.map(item => item.revenue) },
+            { name: 'Purchases', data: membershipRevenueChart.map(item => item.transactions) },
           ]
         }
       })
     },
 
-    // Raw data for additional processing
     rawData: {
       statusBreakdown: statusBreakdown.reduce((acc, item) => {
-        acc[item._id] = {
-          count: item.count,
-          revenue: item.revenue
-        };
+        acc[item._id] = { count: item.count, revenue: item.revenue };
         return acc;
       }, {}),
       membershipPackages: membershipRevenueChart

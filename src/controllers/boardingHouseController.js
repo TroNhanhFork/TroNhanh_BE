@@ -10,13 +10,13 @@ const BoardingHouse = require("../models/BoardingHouse");
 const Room = require('../models/Room');
 const Payment = require("../models/Payment");
 const MembershipPackage = require("../models/MembershipPackage");
-const Membership = require("../models/Membership")
 const User = require('../models/User');
 const Review = require('../models/Reviews');
+const RoommatePost = require('../models/RoommatePost');
 const Booking = require('../models/Booking');
 const mongoose = require('mongoose');
 const path = require('path');
-const fs = require('fs').promises; 
+const fs = require('fs').promises;
 
 // ================================================================
 // SECTION: QUẢN LÝ NHÀ TRỌ (BOARDING HOUSE)
@@ -39,7 +39,16 @@ exports.createBoardingHouse = async (req, res) => {
         const { name, description, amenities } = req.body;
         const location = JSON.parse(req.body.location || "{}");
         const rooms = JSON.parse(req.body.rooms || "[]");
-        const photoPaths = req.files?.map((file) => `/uploads/accommodation/${file.filename}`) || [];
+        const photosMap = (() => {
+            if (!req.body.photosMap) return null;
+            try { return JSON.parse(req.body.photosMap); } catch (e) { return null; }
+        })();
+        let uploadedFiles = [];
+        if (req.files) {
+            if (req.files.photos) uploadedFiles = uploadedFiles.concat(req.files.photos);
+            if (req.files.files) uploadedFiles = uploadedFiles.concat(req.files.files);
+        }
+        const photoPaths = uploadedFiles.map((file) => `/uploads/accommodation/${file.filename}`) || [];
 
         const newBoardingHouse = new BoardingHouse({
             ownerId, name, description, location, amenities, photos: photoPaths,
@@ -48,10 +57,32 @@ exports.createBoardingHouse = async (req, res) => {
         const savedHouse = await newBoardingHouse.save();
 
         if (rooms && Array.isArray(rooms) && rooms.length > 0) {
-            const roomDocs = rooms.map(room => ({
-                ...room,
-                boardingHouseId: savedHouse._id,
-            }));
+            // Map uploaded files to rooms using photosMap or fallback by matching roomNumber in originalname
+            const filePathBase = '/uploads/accommodation/';
+            const roomDocs = rooms.map(room => {
+                const key = String(room.roomNumber || '');
+                const roomPhotos = [];
+
+                if (photosMap && photosMap[key] && Array.isArray(photosMap[key])) {
+                    photosMap[key].forEach(origName => {
+                        const f = uploadedFiles.find(u => u.originalname === origName);
+                        if (f) roomPhotos.push(filePathBase + f.filename);
+                    });
+                } else {
+                    // fallback: include uploaded files whose originalname contains the roomNumber
+                    uploadedFiles.forEach(u => {
+                        if (room.roomNumber && u.originalname.includes(String(room.roomNumber))) {
+                            roomPhotos.push(filePathBase + u.filename);
+                        }
+                    });
+                }
+
+                return {
+                    ...room,
+                    boardingHouseId: savedHouse._id,
+                    photos: roomPhotos,
+                };
+            });
             // Bỏ { session }
             await Room.insertMany(roomDocs);
         }
@@ -71,10 +102,9 @@ exports.createBoardingHouse = async (req, res) => {
 exports.updateBoardingHouse = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, amenities } = req.body;
+        const { name, description } = req.body;
         const location = JSON.parse(req.body.location || "{}");
-        const photoPaths = req.files?.map((file) => `/uploads/accommodation/${file.filename}`) || [];
-
+        const photoPaths = req.files?.photos?.map((file) => `/uploads/accommodation/${file.filename}`) || []; const amenities = JSON.parse(req.body.amenities || "[]");
         // 1. Lấy thông tin nhà trọ hiện tại TRƯỚC KHI cập nhật
         const existingHouse = await BoardingHouse.findById(id);
         if (!existingHouse) {
@@ -85,7 +115,7 @@ exports.updateBoardingHouse = async (req, res) => {
             }
             return res.status(404).json({ message: "Không tìm thấy nhà trọ" });
         }
-        
+
         // Lưu lại danh sách ảnh cũ để xử lý sau
         const oldPhotos = existingHouse.photos || [];
 
@@ -110,13 +140,13 @@ exports.updateBoardingHouse = async (req, res) => {
             const deletePromises = oldPhotos.map(photoUrl => {
                 const filename = path.basename(photoUrl);
                 const filePathToDelete = path.join(process.cwd(), 'public', 'uploads', 'accommodation', filename);
-                
+
                 // Trả về một promise để xóa file
                 return fs.unlink(filePathToDelete).catch(err => {
                     // Nếu lỗi là 'ENOENT' (file không tồn tại), ta bỏ qua
                     if (err.code === 'ENOENT') {
                         console.log(`File không tồn tại, bỏ qua việc xóa: ${filePathToDelete}`);
-                        return; 
+                        return;
                     }
                     // Nếu là lỗi khác, log lại để debug
                     console.error(`Lỗi thực sự khi xóa file ${filePathToDelete}:`, err);
@@ -133,8 +163,8 @@ exports.updateBoardingHouse = async (req, res) => {
         console.error("[UPDATE BOARDING HOUSE ERROR]", err);
         // Dọn dẹp file mới tải lên nếu có lỗi xảy ra sau khi upload
         if (req.files) {
-            const cleanupPromises = req.files.map(file => fs.unlink(file.path).catch(e => console.error("Lỗi khi dọn dẹp file:", e)));
-            await Promise.all(cleanupPromises);
+            const allUploadedFiles = Object.values(req.files || {}).flat();
+            const cleanupPromises = allUploadedFiles.map(file => fs.unlink(file.path).catch(e => console.error("Lỗi khi dọn dẹp file:", e))); await Promise.all(cleanupPromises);
         }
         res.status(500).json({ message: "Server error" });
     }
@@ -162,6 +192,8 @@ exports.getAllBoardingHouses = async (req, res) => {
                     availableRoomsCount: { $size: { $filter: { input: '$rooms', as: 'room', cond: { $eq: ['$$room.status', 'Available'] } } } },
                     minPrice: { $min: '$rooms.price' },
                     maxPrice: { $max: '$rooms.price' },
+                    minArea: { $min: "$rooms.area" },
+                    maxArea: { $max: "$rooms.area" },
                     totalRooms: { $size: '$rooms' }
                 }
             },
@@ -181,59 +213,84 @@ exports.getAllBoardingHouses = async (req, res) => {
  * @route GET /api/boarding-houses/:id
  */
 exports.getBoardingHouseById = async (req, res) => {
-  try {
-    const house = await BoardingHouse.findById(req.params.id).populate(
-      "ownerId",
-      "name email phone"
-    );
-    if (!house)
-      return res.status(404).json({ message: "Không tìm thấy nhà trọ" });
+    try {
+        const house = await BoardingHouse.findById(req.params.id).populate(
+            "ownerId",
+            "name email phone"
+        );
+        if (!house)
+            return res.status(404).json({ message: "Không tìm thấy nhà trọ" });
 
-    // Lấy danh sách phòng
-    const rooms = await Room.find({ boardingHouseId: house._id });
+        // Lấy danh sách phòng
+        const rooms = await Room.find({ boardingHouseId: house._id });
 
-    // 🔥 Gắn thêm trạng thái booking cho mỗi phòng
-    const roomsWithStatus = await Promise.all(
-      rooms.map(async (room) => {
-        const latestBooking = await Booking.findOne({ roomId: room._id })
-          .sort({ createdAt: -1 })
-          .lean();
+        // 🔥 Gắn thêm trạng thái booking cho mỗi phòng
+        const roomsWithStatus = await Promise.all(
+            rooms.map(async (room) => {
+                const latestBooking = await Booking.findOne({ roomId: room._id })
+                    .sort({ createdAt: -1 })
+                    .lean();
 
-        let bookingStatus = "Available"; // mặc định
+                let bookingStatus = "Available"; // mặc định
 
-        if (latestBooking) {
-          if (
-            latestBooking.status === "paid" &&
-            latestBooking.contractStatus === "approved"
-          ) {
-            bookingStatus = "Paid"; // ✅ đã thanh toán & được duyệt
-          } else if (
-            latestBooking.status === "pending" ||
-            latestBooking.contractStatus === "pending"
-          ) {
-            bookingStatus = "Pending"; // 🕓 chờ thanh toán hoặc chờ duyệt
-          }
+                if (latestBooking) {
+                    if (
+                        latestBooking.status === "paid" &&
+                        latestBooking.contractStatus === "approved"
+                    ) {
+                        bookingStatus = "Paid"; // ✅ đã thanh toán & được duyệt
+                    } else if (
+                        latestBooking.status === "pending" ||
+                        latestBooking.contractStatus === "pending"
+                    ) {
+                        bookingStatus = "Pending"; // 🕓 chờ thanh toán hoặc chờ duyệt
+                    }
+                }
+
+                return {
+                    ...room.toObject(),
+                    bookingStatus,
+                };
+            })
+        );
+
+        const reviews = await Review.find({
+            boardingHouseId: req.params.id,
+        })
+            .populate("customerId", "name avatar")
+            .sort({ createdAt: -1 });
+
+        // Get roommate posts for this boarding house and attach to room objects
+        let posts = [];
+        try {
+            posts = await RoommatePost.find({ boardingHouseId: house._id })
+                .populate('userId', 'name avatar phone gender')
+                .sort({ createdAt: -1 })
+                .lean();
+        } catch (err) {
+            console.error('[GET BOARDING HOUSE] failed to load roommate posts', err);
         }
 
-        return {
-          ...room.toObject(),
-          bookingStatus,
-        };
-      })
-    );
+        const postsByRoom = posts.reduce((acc, p) => {
+            if (p.roomId) acc[String(p.roomId)] = p;
+            return acc;
+        }, {});
 
-    const reviews = await Review.find({
-      boardingHouseId: req.params.id,
-    })
-      .populate("customerId", "name avatar")
-      .sort({ createdAt: -1 });
+        const roomsWithPosts = roomsWithStatus.map((r) => {
+            const pid = postsByRoom[String(r._id)];
+            return {
+                ...r,
+                hasRoommatePost: !!pid,
+                roommatePost: pid || null,
+            };
+        });
 
-    const result = { ...house.toObject(), rooms: roomsWithStatus, reviews };
-    res.status(200).json(result);
-  } catch (err) {
-    console.error("[GET BOARDING HOUSE BY ID ERROR]", err);
-    res.status(500).json({ message: "Server error" });
-  }
+        const result = { ...house.toObject(), rooms: roomsWithPosts, reviews };
+        res.status(200).json(result);
+    } catch (err) {
+        console.error("[GET BOARDING HOUSE BY ID ERROR]", err);
+        res.status(500).json({ message: "Server error" });
+    }
 };
 
 /**
@@ -241,32 +298,58 @@ exports.getBoardingHouseById = async (req, res) => {
  * @route DELETE /api/boarding-houses/:id
  */
 exports.deleteBoardingHouse = async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
     try {
         const houseId = req.params.id;
 
-        const bookedRoom = await Room.findOne({ boardingHouseId: houseId, status: "Booked" });
+        console.log("👉 DELETE request for houseId:", houseId);
+
+        // 1. Kiểm tra phòng đang được đặt
+        const bookedRoom = await Room.findOne({
+            boardingHouseId: houseId,
+            status: "Booked"
+        });
+
+        console.log("👉 bookedRoom:", bookedRoom);
+
         if (bookedRoom) {
-            await session.abortTransaction();
-            return res.status(400).json({ message: "Không thể xóa nhà trọ này vì đang có phòng được khách hàng đặt!" });
+            return res.status(400).json({
+                message: "Không thể xóa nhà trọ này vì đang có phòng được khách hàng đặt!"
+            });
         }
 
-        await Review.deleteMany({ boardingHouseId: houseId }, { session });
-        await Room.deleteMany({ boardingHouseId: houseId }, { session });
-        const deletedHouse = await BoardingHouse.findByIdAndDelete(houseId, { session });
-        if (!deletedHouse) throw new Error("Không tìm thấy nhà trọ để xóa.");
+        // 2. Xóa review
+        console.log("👉 Deleting reviews...");
+        await Review.deleteMany({ boardingHouseId: houseId });
 
-        await session.commitTransaction();
-        res.status(200).json({ message: "Xóa nhà trọ và tất cả các phòng thành công" });
+        // 3. Xóa rooms
+        console.log("👉 Deleting rooms...");
+        await Room.deleteMany({ boardingHouseId: houseId });
+
+        // 4. Xóa boarding house
+        console.log("👉 Deleting house...");
+        const deletedHouse = await BoardingHouse.deleteOne({ _id: houseId });
+
+        if (deletedHouse.deletedCount === 0) {
+            return res.status(404).json({
+                message: "Không tìm thấy nhà trọ để xóa."
+            });
+        }
+
+        res.status(200).json({
+            message: "Xóa nhà trọ và tất cả các phòng thành công"
+        });
+
     } catch (err) {
-        await session.abortTransaction();
         console.error("[DELETE BOARDING HOUSE ERROR]", err);
-        res.status(500).json({ message: "Server error" });
-    } finally {
-        session.endSession();
+        res.status(500).json({
+            message: "Server error",
+            error: err.message
+        });
     }
 };
+
+
+
 
 // ================================================================
 // SECTION: QUẢN LÝ ĐÁNH GIÁ (REVIEW)
@@ -286,20 +369,18 @@ exports.submitReview = async (req, res) => {
         if (!house) return res.status(404).json({ message: "Không tìm thấy nhà trọ" });
 
         const roomIds = (await Room.find({ boardingHouseId }).select('_id')).map(r => r._id);
-        const userBooking = await Booking.findOne({
-  userId,
-  boardingHouseId,
-  contractStatus: { $in: ['paid', 'approved'] }
-});
-
+        const userBooking = await Booking.findOne({ userId, roomId: { $in: roomIds }, status: { $in: ['paid', 'completed'] } });
         if (!userBooking) return res.status(403).json({ message: "Bạn chỉ có thể đánh giá nhà trọ mà bạn đã đặt phòng." });
 
         const existingReview = await Review.findOne({ boardingHouseId, customerId: userId });
         if (existingReview) return res.status(400).json({ message: "Bạn đã đánh giá nhà trọ này rồi." });
 
-        const newReview = new Review({ boardingHouseId, customerId: userId, user: userId, rating, comment, purpose });
+        const newReview = new Review({ boardingHouseId, customerId: userId, roomId: userBooking.roomId, user: userId, rating, comment, purpose });
         await newReview.save();
-        const populatedReview = await Review.findById(newReview._id).populate('customerId', 'name avatar');
+        const populatedReview = await Review.findById(newReview._id)
+            .populate('customerId', 'name avatar')
+            .populate('user', 'name avatar')
+            .populate('roomId', 'roomNumber');;
         res.status(201).json({ review: populatedReview });
     } catch (error) {
         console.error("Error submitting review:", error);
@@ -310,7 +391,11 @@ exports.submitReview = async (req, res) => {
 exports.getReviews = async (req, res) => {
     try {
         const { id } = req.params;
-        const reviews = await Review.find({ boardingHouseId: id }).populate('user', 'name avatar');
+        const reviews = await Review.find({ boardingHouseId: id })
+            .populate('user', 'name avatar')
+            .populate('customerId', 'name avatar')
+            .populate('roomId', 'roomNumber');
+
         res.status(200).json({ reviews });
     } catch (error) {
         console.error("Error getting reviews:", error);
@@ -324,16 +409,14 @@ exports.editReview = async (req, res) => {
         const { reviewId } = req.params;
         const { rating, comment, purpose } = req.body;
 
+        // ... (Các đoạn kiểm tra giữ nguyên) ...
         if (!rating || !comment || !purpose) {
             return res.status(400).json({ message: "All fields are required." });
         }
-
         const review = await Review.findById(reviewId);
         if (!review) {
             return res.status(404).json({ message: "Review not found" });
         }
-
-        // Chỉ cho phép user đã tạo review được sửa
         if (String(review.user) !== String(req.user.id)) {
             return res.status(403).json({ message: "Not authorized to edit this review" });
         }
@@ -343,7 +426,14 @@ exports.editReview = async (req, res) => {
         review.purpose = purpose;
         await review.save();
 
-        res.status(200).json({ review });
+        // THAY ĐỔI Ở ĐÂY: Populate dữ liệu trước khi gửi về
+        const populatedReview = await Review.findById(review._id)
+            .populate('user', 'name avatar')
+            .populate('customerId', 'name avatar')
+            .populate('roomId', 'roomNumber');
+
+        res.status(200).json({ review: populatedReview }); // Trả về review đã populate
+
     } catch (error) {
         console.error("Error editing review:", error);
         res.status(500).json({ message: "Internal server error" });
@@ -382,7 +472,7 @@ exports.deleteReview = async (req, res) => {
 const getOwnerProperties = async (ownerId) => {
     const houses = await BoardingHouse.find({ ownerId }).select('_id');
     const houseIds = houses.map(h => h._id);
-    const rooms = await Room.find({ boardingHouseId: { $in: houseIds } }).select('_id');
+    const rooms = await Room.find({ boardingHouseId: { $in: houseIds } }).select('_id status');
     const roomIds = rooms.map(r => r._id);
     return { houses, houseIds, rooms, roomIds };
 };
@@ -393,74 +483,41 @@ const getOwnerProperties = async (ownerId) => {
  * @route GET /api/owner/statistics
  */
 exports.getOwnerStatistics = async (req, res) => {
-  try {
-    const ownerId = req.user.id;
+    try {
+        const ownerId = req.user.id;
+        const { houses, houseIds, rooms, roomIds } = await getOwnerProperties(ownerId);
+        const totalBoardingHouses = houses.length;
+        const availableRooms = rooms.filter(r => r.status === 'Available').length;
 
-    // 🔹 1. Lấy toàn bộ BoardingHouse của owner
-    const houses = await BoardingHouse.find({ ownerId }).select("_id approvedStatus");
-    const houseIds = houses.map(h => h._id);
 
-    const totalHouses = houses.length;
-    const approvedHouses = houses.filter(h => h.approvedStatus === "approved").length;
-    const pendingHouses = houses.filter(h => h.approvedStatus === "pending").length;
-    const rejectedHouses = houses.filter(h => h.approvedStatus === "rejected").length;
+        const allBookings = await Booking.find({
+            roomId: { $in: roomIds },
+            status: { $in: ['paid', 'completed'] }
+        })
 
-    // 🔹 Nếu chưa có nhà trọ nào => return sớm
-    if (houseIds.length === 0) {
-      return res.status(200).json({
-        success: true,
-        statistics: {
-          totalHouses,
-          approvedHouses,
-          pendingHouses,
-          rejectedHouses,
-          totalBookings: 0,
-          totalRevenue: 0,
-        },
-      });
+        const bookingIds = allBookings.map(b => b._id);
+
+        const payments = await Payment.find({
+            bookingId: { $in: bookingIds },
+            status: 'Paid'
+        });
+
+        const totalRevenue = payments.reduce((sum, payment) => sum + (payment?.amount || 0), 0);
+        res.status(200).json({
+            success: true, statistics: {
+                totalBoardingHouses,
+                totalRooms: rooms.length,
+                availableRooms,
+                bookedRooms: rooms.length - availableRooms,
+                totalRevenue,
+                totalBookings: allBookings.length
+            }
+        });
+    } catch (error) {
+        console.error("Error getting owner statistics:", error);
+        res.status(500).json({ message: "Internal server error" });
     }
-
-    // 🔹 2. Lấy tất cả booking của các nhà trọ đó
-    const bookings = await Booking.find({
-      boardingHouseId: { $in: houseIds },
-    })
-      .populate("roomId", "price") // để lấy giá từ Room
-      .select("contractStatus roomId");
-
-    // 🔹 3. Chuẩn hóa contractStatus về chữ thường
-    const normalizeStatus = (status) => (status || "").toLowerCase();
-
-    // 🔹 4. Lọc booking có status là 'paid' hoặc 'approved'
-    const relevantBookings = bookings.filter((b) =>
-      ["Paid", "approved"].includes(normalizeStatus(b.contractStatus))
-    );
-
-    // 🔹 5. Tính tổng số booking và tổng doanh thu
-    const totalBookings = relevantBookings.length;
-    const totalRevenue = relevantBookings.reduce(
-      (sum, b) => sum + (b.roomId?.price || 0),
-      0
-    );
-
-    // 🔹 6. Trả về kết quả
-    return res.status(200).json({
-      success: true,
-      statistics: {
-        totalHouses,
-        approvedHouses,
-        pendingHouses,
-        rejectedHouses,
-        totalBookings,
-        totalRevenue,
-      },
-    });
-  } catch (error) {
-    console.error("Error getting owner statistics:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
 };
-
-
 
 /**
  * @description Lấy danh sách các nhà trọ của owner kèm rating trung bình.
@@ -549,48 +606,61 @@ exports.getBoardingHouseRatingsForOwner = async (req, res) => {
  * @route GET /api/owner/bookings/recent
  */
 exports.getOwnerRecentBookings = async (req, res) => {
-  try {
-    const ownerId = req.user.id;
-    const { limit = 10 } = req.query;
+    try {
+        const ownerId = req.user.id;
+        const limit = parseInt(req.query.limit) || 10;
 
-    // 🔹 Tìm tất cả nhà trọ thuộc chủ sở hữu
-    const houses = await BoardingHouse.find({ ownerId }).select("_id");
-    const houseIds = houses.map(h => h._id);
+        // 🏠 Lấy danh sách room thuộc owner
+        const { roomIds } = await getOwnerProperties(ownerId);
+        if (!roomIds || roomIds.length === 0) {
+            return res.status(200).json({ success: true, bookings: [] });
+        }
 
-    if (houseIds.length === 0) {
-      return res.status(200).json({ success: true, bookings: [] });
+        // 🔍 Lấy các booking theo roomId
+        const recentBookings = await Booking.find({ roomId: { $in: roomIds } })
+            .populate("userId", "name email")
+            .populate({
+                path: "roomId",
+                select: "roomNumber",
+                populate: { path: "boardingHouseId", select: "name" },
+            })
+            .sort({ createdAt: -1 })
+            .limit(limit);
+
+        if (!recentBookings.length) {
+            return res.status(200).json({ success: true, bookings: [] });
+        }
+
+        // 💳 Lấy danh sách payment tương ứng với các booking vừa lấy
+        const bookingIds = recentBookings.map((b) => b._id);
+        const payments = await Payment.find({
+            bookingId: { $in: bookingIds },
+            status: "Paid",
+        });
+
+        // Tạo map bookingId → payment.amount
+        const paymentMap = {};
+        payments.forEach((p) => {
+            paymentMap[p.bookingId.toString()] = p.amount || 0;
+        });
+
+        // 🧩 Format dữ liệu trả về
+        const formattedBookings = recentBookings.map((booking) => ({
+            key: booking._id,
+            customerName: booking.userId?.name || "N/A",
+            boardingHouseName: booking.roomId?.boardingHouseId?.name || "N/A",
+            roomNumber: booking.roomId?.roomNumber || "N/A",
+            bookingDate: booking.createdAt,
+            amount: paymentMap[booking._id.toString()] || 0,
+            status: booking.status,
+        }));
+
+        res.status(200).json({ success: true, bookings: formattedBookings });
+    } catch (error) {
+        console.error("❌ Error getting owner recent bookings:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
-
-    // 🔹 Tìm tất cả bookings thuộc các nhà trọ đó
-    const bookings = await Booking.find({ boardingHouseId: { $in: houseIds } })
-      .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .populate("userId", "name email")
-      .populate("boardingHouseId", "name photos location price")
-      .populate("roomId", "price roomNumber"); // ✅ lấy giá và số phòng
-
-    // 🔹 Trả dữ liệu đã được format
-    res.status(200).json({
-      success: true,
-      bookings: bookings.map(b => ({
-        _id: b._id,
-        customerName: b.userId?.name,
-        houseName: b.boardingHouseId?.name,
-         houseId: b.boardingHouseId?._id,       
-    housePhotos: b.boardingHouseId?.photos, 
-        roomNumber: b.roomId?.roomNumber || "N/A",
-        amount: b.roomId?.price || 0,
-        status: b.status || b.contractStatus, 
-        createdAt: b.createdAt
-      }))
-    });
-  } catch (error) {
-    console.error("Error getting recent bookings:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
 };
-
-
 
 
 /**
@@ -598,84 +668,78 @@ exports.getOwnerRecentBookings = async (req, res) => {
  * @route GET /api/owner/boarding-houses/top
  */
 exports.getOwnerTopBoardingHouses = async (req, res) => {
-  try {
-    const ownerId = req.user.id;
-    const { limit = 5 } = req.query;
+    try {
+        const ownerId = req.user.id;
+        const limit = parseInt(req.query.limit) || 5;
+        const { houses } = await getOwnerProperties(ownerId);
 
-    const houses = await BoardingHouse.find({ ownerId, approvedStatus: "approved" }).select("_id name");
+        const stats = await Promise.all(
+            houses.map(async (house) => {
+                const roomsInHouse = await Room.find({ boardingHouseId: house._id }).select('_id');
+                const roomIdsInHouse = roomsInHouse.map(r => r._id);
 
-    const housesWithRatings = await Promise.all(
-      houses.map(async (house) => {
-        const reviews = await Review.find({ boardingHouseId: house._id });
-        const avgRating =
-          reviews.length > 0
-            ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-            : 0;
-        return { _id: house._id, name: house.name, averageRating: parseFloat(avgRating), totalReviews: reviews.length };
-      })
-    );
+                const bookingCount = await Booking.countDocuments({ roomId: { $in: roomIdsInHouse }, status: { $in: ['paid', 'completed'] } });
 
-    const sorted = housesWithRatings.sort((a, b) => b.averageRating - a.averageRating);
-    res.status(200).json({ success: true, accommodations: sorted.slice(0, limit) });
-  } catch (error) {
-    console.error("Error getting top boarding houses:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
+                const reviews = await Review.find({ boardingHouseId: house._id });
+                let avgRating = 0;
+                if (reviews.length > 0) {
+                    avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+                }
+
+                return {
+                    key: house._id,
+                    name: house.name,
+                    bookings: bookingCount,
+                    rating: parseFloat(avgRating.toFixed(1))
+                };
+            })
+        );
+
+        const topHouses = stats.sort((a, b) => b.bookings - a.bookings).slice(0, limit);
+        res.status(200).json({ success: true, topBoardingHouses: topHouses });
+    } catch (error) {
+        console.error("Error getting owner top houses:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
 };
-
 
 /**
  * @description Lấy thông tin gói thành viên hiện tại và số bài đăng.
  * @route GET /api/owner/membership-info
  */
 exports.getOwnerMembershipInfo = async (req, res) => {
-  try {
-    const ownerId = req.user.id;
+    try {
+        const ownerId = req.user.id;
+        const latestPayment = await Payment.findOne({ ownerId, status: "Paid" }).sort({ createAt: -1 }).populate("membershipPackageId");
 
-    // 🔹 Lấy membership mới nhất của owner
-    const latestMembership = await Membership.findOne({ ownerId })
-      .sort({ endDate: -1 })
-      .populate("packageId");
+        if (!latestPayment || !latestPayment.membershipPackageId) {
+            return res.status(200).json({ success: true, membershipInfo: { hasActiveMembership: false } });
+        }
 
-    // 🔹 Nếu chưa từng mua gói hoặc không có package hợp lệ
-    if (!latestMembership || !latestMembership.packageId) {
-      return res.status(200).json({
-        success: true,
-        membershipInfo: { hasActiveMembership: false },
-      });
+        const membershipPackage = latestPayment.membershipPackageId;
+        const expiredAt = new Date(latestPayment.createdAt.getTime() + (membershipPackage.duration || 0) * 24 * 60 * 60 * 1000);
+        const isExpired = new Date() > expiredAt;
+
+        // Đếm số lượng NHÀ TRỌ, không phải phòng trọ
+        const currentPostsCount = await BoardingHouse.countDocuments({ ownerId });
+        const postsAllowed = membershipPackage.postsAllowed || 0;
+
+        res.status(200).json({
+            success: true,
+            membershipInfo: {
+                hasActiveMembership: !isExpired,
+                packageName: membershipPackage.packageName,
+                postsAllowed,
+                currentPostsCount,
+                remainingPosts: Math.max(0, postsAllowed - currentPostsCount),
+                isExpired,
+                expiredAt
+            }
+        });
+    } catch (error) {
+        console.error("Error getting owner membership info:", error);
+        res.status(500).json({ message: "Internal server error" });
     }
-
-    const packageInfo = latestMembership.packageId;
-
-    // 🔹 Kiểm tra hết hạn
-    const isExpired = new Date() > new Date(latestMembership.endDate);
-
-    // 🔹 Đếm số lượng nhà trọ hiện có của owner
-    const currentPostsCount = await BoardingHouse.countDocuments({ ownerId });
-
-    const postsAllowed = packageInfo.postsAllowed || 0;
-
-    // 🔹 Trả về kết quả
-    res.status(200).json({
-      success: true,
-      membershipInfo: {
-        hasActiveMembership: latestMembership.status === "Active" && !isExpired,
-        packageName: packageInfo.packageName,
-        type: latestMembership.type,
-        price: latestMembership.price,
-        postsAllowed,
-        currentPostsCount,
-        remainingPosts: Math.max(0, postsAllowed - currentPostsCount),
-        isExpired,
-        startDate: latestMembership.startDate,
-        expiredAt: latestMembership.endDate,
-        status: latestMembership.status,
-      },
-    });
-  } catch (error) {
-    console.error("Error getting owner membership info:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
 };
 
 /**
@@ -683,54 +747,63 @@ exports.getOwnerMembershipInfo = async (req, res) => {
  * @route GET /api/owner/revenue/monthly
  */
 exports.getOwnerMonthlyRevenue = async (req, res) => {
-  try {
-    const ownerId = req.user.id;
-    const { months = 6 } = req.query;
+    try {
+        const ownerId = req.user.id;
+        const { months = 6 } = req.query;
+        const { roomIds } = await getOwnerProperties(ownerId);
+        if (!roomIds || roomIds.length === 0) {
 
-    // 🔹 Lấy tất cả nhà trọ thuộc owner
-    const houses = await BoardingHouse.find({ ownerId }).select("_id");
-    const houseIds = houses.map(h => h._id);
+            return res.status(200).json({ success: true, monthlyRevenue: [] });
+        }
 
-    if (houseIds.length === 0) {
-      return res.status(200).json({ success: true, monthlyRevenue: [] });
+        const monthlyData = [];
+
+        // Lặp qua 6 tháng gần nhất
+        for (let i = parseInt(months) - 1; i >= 0; i--) {
+            const targetDate = new Date();
+            targetDate.setMonth(targetDate.getMonth() - i);
+
+            const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+            const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+
+            // Lấy tất cả booking trong tháng đó
+            const monthlyBookings = await Booking.find({
+                roomId: { $in: roomIds },
+                status: { $in: ["paid", "completed"] },
+                createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+            });
+
+            const bookingIds = monthlyBookings.map(b => b._id);
+
+            // Lấy các payments tương ứng
+            const payments = await Payment.find({
+                bookingId: { $in: bookingIds },
+                status: "Paid",
+            });
+
+            // Tính tổng revenue tháng đó
+            const totalRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+            const monthName = targetDate.toLocaleDateString("vi-VN", {
+                month: "short",
+                year: "numeric",
+            });
+
+            monthlyData.push({
+                month: monthName,
+                monthNumber: targetDate.getMonth() + 1,
+                year: targetDate.getFullYear(),
+                revenue: totalRevenue,
+                bookingsCount: monthlyBookings.length,
+            });
+        }
+
+        res.status(200).json({ success: true, monthlyRevenue: monthlyData });
+    } catch (error) {
+        console.error("❌ Error getting owner monthly revenue:", error);
+        res.status(500).json({ success: false, message: "Internal server error" });
     }
-
-    const monthlyData = [];
-
-    for (let i = months - 1; i >= 0; i--) {
-      const targetDate = new Date();
-      targetDate.setMonth(targetDate.getMonth() - i);
-
-      // Tính khoảng thời gian đầu và cuối tháng
-      const start = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-      const end = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59, 999);
-
-      // 🔹 Lấy tất cả booking thuộc các nhà trọ này
-      const bookings = await Booking.find({
-        boardingHouseId: { $in: houseIds },
-        status: { $in: ["Paid", "completed"] }, // các trạng thái đã thanh toán
-        createdAt: { $gte: start, $lte: end },
-      }).populate("roomId", "price");
-
-      // 🔹 Tính doanh thu từ các booking
-      const revenue = bookings.reduce((sum, b) => sum + (b.roomId?.price || 0), 0);
-
-      monthlyData.push({
-        month: targetDate.toLocaleString("vi-VN", { month: "short", year: "numeric" }),
-        revenue,
-        bookingsCount: bookings.length,
-        monthNumber: targetDate.getMonth() + 1,
-        year: targetDate.getFullYear(),
-      });
-    }
-
-    res.status(200).json({ success: true, monthlyRevenue: monthlyData });
-  } catch (error) {
-    console.error("Error getting monthly revenue:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
 };
-
 
 // Get Owner Membership Info with Boardinghouse Count
 exports.getOwnerMembershipInfo = async (req, res) => {
@@ -821,7 +894,7 @@ exports.getOwnerTopAccommodations = async (req, res) => {
 
                 // Đếm số lượng booking của các phòng này
                 const bookingCount = await Booking.countDocuments({
-                    propertyId: { $in: roomIdsInHouse },
+                    roomId: { $in: roomIdsInHouse },
                     status: { $in: ['paid', 'completed'] }
                 });
 
@@ -864,41 +937,85 @@ exports.getOwnerTopAccommodations = async (req, res) => {
  * @access Owner
  */
 exports.getOwnerCurrentMembership = async (req, res) => {
-  try {
-    const ownerId = req.user.id;
+    try {
+        const ownerId = req.user.id;
 
-    const currentMembership = await Membership.findOne({
-      ownerId,
-      status: { $in: ["Active", "Pending"] }
-    })
-      .sort({ endDate: -1 })
-      .populate("packageId");
+        // Lấy payment gần nhất có status "Paid"
+        const latestPayment = await Payment.findOne({
+            ownerId,
+            status: "Paid",
+        })
+            .sort({ createAt: -1 })
+            .populate("membershipPackageId");
 
-    if (!currentMembership) {
-      return res.status(200).json({
-        success: true,
-        membership: {
-          packageName: "No Active Membership",
-          isActive: false,
-          expiredAt: null,
-        },
-      });
+        if (!latestPayment || !latestPayment.membershipPackageId) {
+            return res.status(200).json({
+                success: true,
+                membership: {
+                    packageName: "Chưa có gói thành viên",
+                    isActive: false,
+                }
+            });
+        }
+
+        const membershipPackage = latestPayment.membershipPackageId;
+        const durationDays = membershipPackage.duration || 0;
+        const createdAt = latestPayment.createdAt;
+        const expiredAt = new Date(
+            createdAt.getTime() + durationDays * 24 * 60 * 60 * 1000
+        );
+
+        res.status(200).json({
+            success: true,
+            membership: {
+                packageName: membershipPackage.packageName || "Unknown Package",
+                isActive: new Date() <= expiredAt,
+                purchaseDate: createdAt,
+                expiredAt,
+            }
+        });
+    } catch (error) {
+        console.error("Error getting owner current membership:", error);
+        res.status(500).json({ success: false, message: "Internal server error" });
     }
+};
 
-    const isExpired = new Date() > new Date(currentMembership.endDate);
 
-    res.status(200).json({
-      success: true,
-      membership: {
-        packageName: currentMembership.packageId?.packageName || "Unknown Package",
-        isActive: !isExpired,
-        expiredAt: currentMembership.endDate,
-        startDate: currentMembership.startDate,
-        status: currentMembership.status,
-      },
-    });
-  } catch (error) {
-    console.error("Error getting current membership:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
+exports.getBoardingHouseDetailsByBooking = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+
+        // Lấy booking theo ID
+        const booking = await Booking.findById(bookingId)
+            .populate("roomId")
+            .populate("userId", "name email");
+
+        if (!booking) {
+            return res.status(404).json({ success: false, message: "Booking not found" });
+        }
+
+        // Lấy phòng & boarding house
+        const room = await Room.findById(booking.roomId).populate("boardingHouseId");
+        if (!room || !room.boardingHouseId) {
+            return res.status(404).json({ success: false, message: "Room or Boarding house not found" });
+        }
+
+        // Lấy payment (đã thanh toán)
+        const payment = await Payment.findOne({
+            bookingId: booking._id,
+            status: "Paid"
+        });
+
+        const boardingHouse = room.boardingHouseId;
+
+
+        res.status(200).json({
+            success: true,
+            boardingHouse: boardingHouse,
+            room: room
+        });
+    } catch (error) {
+        console.error("Error fetching boarding house details by booking:", error);
+        res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };

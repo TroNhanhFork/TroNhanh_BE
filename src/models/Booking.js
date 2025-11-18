@@ -27,6 +27,14 @@ const BookingSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  tenantSignature: {
+    type: String, 
+    default: null,
+  },
+  contractSignedDate: {
+    type: Date,
+    default: null,
+  },
   approvedAt: Date,
   rejectedAt: Date,
   createdAt: { type: Date, default: Date.now },

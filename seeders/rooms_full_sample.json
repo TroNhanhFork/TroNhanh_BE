@@ -1,0 +1,82 @@
+[
+  {
+    "_id": { "$oid": "655000000000000000000011" },
+    "boardingHouseId": { "$oid": "654000000000000000000001" },
+    "customerId": { "$oid": "68f4e941fe36ba7fe694bcac" },
+    "roomNumber": "A101",
+    "description": "Phòng phía trước, nhiều ánh sáng, có cửa sổ lớn.",
+    "price": 3000000,
+    "area": 20,
+    "status": "Available",
+    "photos": [
+      "/uploads/accommodation/rooms/nhatro_xanh_a101_1.jpg",
+      "/uploads/accommodation/rooms/nhatro_xanh_a101_2.jpg"
+    ],
+    "amenities": ["WiFi", "Máy lạnh"],
+    "createdAt": { "$date": "2025-10-01T08:10:00Z" },
+    "updatedAt": { "$date": "2025-10-01T08:10:00Z" }
+  },
+  {
+    "_id": { "$oid": "655000000000000000000012" },
+    "boardingHouseId": { "$oid": "654000000000000000000001" },
+    "customerId": { "$oid": "68f4e941fe36ba7fe694bcac" },
+    "roomNumber": "A102",
+    "description": "Phòng có ban công, nội thất cơ bản.",
+    "price": 3000000,
+    "area": 18,
+    "status": "Booked",
+    "photos": [
+      "/uploads/accommodation/rooms/nhatro_xanh_a102_1.jpg"
+    ],
+    "amenities": ["Ban công", "Bếp nhỏ"],
+    "createdAt": { "$date": "2025-10-02T08:10:00Z" },
+    "updatedAt": { "$date": "2025-10-05T08:30:00Z" }
+  },
+  {
+    "_id": { "$oid": "655000000000000000000013" },
+    "boardingHouseId": { "$oid": "654000000000000000000002" },
+    "customerId": { "$oid": "68f4e941fe36ba7fe694bcac" },
+    "roomNumber": "B201",
+    "description": "Phòng nhỏ gọn, phù hợp sinh viên.",
+    "price": 1800000,
+    "area": 15,
+    "status": "Available",
+    "photos": [
+      "/uploads/accommodation/rooms/ktx_b201_1.jpg"
+    ],
+    "amenities": ["Bếp chung"],
+    "createdAt": { "$date": "2025-09-16T08:10:00Z" },
+    "updatedAt": { "$date": "2025-09-16T08:10:00Z" }
+  },
+  {
+    "_id": { "$oid": "655000000000000000000014" },
+    "boardingHouseId": { "$oid": "654000000000000000000003" },
+    "customerId": { "$oid": "68f4e941fe36ba7fe694bcac" },
+    "roomNumber": "C301",
+    "description": "Phòng rộng, có ban công, view đẹp.",
+    "price": 2500000,
+    "area": 22,
+    "status": "Booked",
+    "photos": [
+      "/uploads/accommodation/rooms/nhatro_sach_c301_1.jpg",
+      "/uploads/accommodation/rooms/nhatro_sach_c301_2.jpg"
+    ],
+    "amenities": ["Ban công", "Máy giặt"],
+    "createdAt": { "$date": "2025-08-21T08:10:00Z" },
+    "updatedAt": { "$date": "2025-09-01T08:10:00Z" }
+  },
+  {
+    "_id": { "$oid": "655000000000000000000015" },
+    "boardingHouseId": { "$oid": "654000000000000000000003" },
+    "customerId": { "$oid": "68f4e941fe36ba7fe694bcac" },
+    "roomNumber": "A103",
+    "description": "Phòng tầng trệt, dễ tiếp cận, ít tiếng ồn.",
+    "price": 2800000,
+    "area": 17,
+    "status": "Available",
+    "photos": [],
+    "amenities": ["Gác lửng"],
+    "createdAt": { "$date": "2025-10-03T08:10:00Z" },
+    "updatedAt": { "$date": "2025-10-03T08:10:00Z" }
+  }
+]

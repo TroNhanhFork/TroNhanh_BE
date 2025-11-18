@@ -4,6 +4,7 @@ const Room = require('../models/Room');
 const Payment = require("../models/Payment");
 const Notification = require("../models/Notification"); // Thêm import còn thiếu
 const mongoose = require('mongoose')
+
 exports.createBooking = async (req, res) => {
   try {
     const { userId, boardingHouseId, guestInfo, startDate, leaseDuration, guests } =
@@ -22,7 +23,7 @@ exports.createBooking = async (req, res) => {
     }
     const existingBooking = await Booking.findOne({
       userId,
-      propertyId,
+      boardingHouseId,
       status: "pending",
     });
 
@@ -41,7 +42,7 @@ exports.createBooking = async (req, res) => {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     const booking = await Booking.create({
       userId,
-      propertyId,
+      boardingHouseId,
       guestInfo,
       status: "pending",
     });
@@ -146,7 +147,7 @@ exports.getUserBookingForBoardingHouse = async (req, res) => {
     const booking = await Booking.findOne({
       userId,
       roomId: { $in: roomIds },
-      status: { $in: ["Pending", "Cancel", "Paid"] }, 
+      status: { $in: ["Pending", "Cancel", "paid"] },
     })
       .populate("boardingHouseId", "name location photos")
       .populate("roomId", "roomNumber price area");
@@ -160,8 +161,8 @@ exports.getUserBookingForBoardingHouse = async (req, res) => {
       booking.status === "paid"
         ? "Paid"
         : booking.status === "approved" || booking.status === "pending"
-        ? "Pending"
-        : "Other";
+          ? "Pending"
+          : "Other";
 
     // 🔹 4. Trả về kết quả
     res.status(200).json({
@@ -175,90 +176,105 @@ exports.getUserBookingForBoardingHouse = async (req, res) => {
 };
 
 exports.getUserBookingHistory = async (req, res) => {
-    try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
-
-        console.log(`Getting booking history for user: ${userId}`);
-
-        const bookings = await Booking.aggregate([
-            // 1. Tìm booking của người dùng
-            { $match: { userId: new mongoose.Types.ObjectId(userId) } },
-            // 2. Sắp xếp mới nhất trước
-            { $sort: { createdAt: -1 } },
-            // 3. Join với collection 'payments' (tìm payment có cùng bookingId)
-            {
-                $lookup: {
-                    from: 'payments', // Tên collection payments
-                    localField: '_id', // Khóa cục bộ là _id của booking
-                    foreignField: 'bookingId', // Khóa ngoại trong payment là bookingId
-                    as: 'paymentDetails' // Tên mảng chứa kết quả join
-                }
-            },
-            // 4. Join với collection 'rooms'
-            {
-                $lookup: {
-                    from: 'rooms',
-                    localField: 'roomId',
-                    foreignField: '_id',
-                    as: 'roomDetails'
-                }
-            },
-            // 5. Join với collection 'boardinghouses'
-            {
-                $lookup: {
-                    from: 'boardinghouses',
-                    localField: 'boardingHouseId',
-                    foreignField: '_id',
-                    as: 'houseDetails'
-                }
-            },
-            // 6. Định dạng lại kết quả
-            {
-                $project: {
-                    _id: 1,
-                    contractStatus: 1,
-                    status: 1, // Trạng thái thanh toán của Booking
-                    rejectionReason: 1,
-                    createdAt: 1, // Ngày tạo booking (ngày yêu cầu)
-                    guestInfo: 1, // Giữ lại guestInfo
-                    // Lấy object đầu tiên từ mảng kết quả join
-                    room: { $arrayElemAt: ['$roomDetails', 0] },
-                    boardingHouse: { $arrayElemAt: ['$houseDetails', 0] },
-                    // Lấy thông tin payment (nếu có)
-                    paymentInfo: { $arrayElemAt: ['$paymentDetails', 0] }
-                }
-            },
-            // 7. (Tùy chọn) Thêm các trường tính toán nếu cần
-             {
-                 $addFields: {
-                     checkInDate: '$guestInfo.startDate',
-                     // Tính checkOutDate (ví dụ)
-                     checkOutDate: {
-                         $cond: {
-                             if: { $and: [ '$guestInfo.startDate', '$guestInfo.leaseDuration' ] },
-                             then: { $add: ['$guestInfo.startDate', { $multiply: ['$guestInfo.leaseDuration', 30, 24 * 60 * 60 * 1000] }] }, // Giả sử 1 tháng = 30 ngày
-                             else: null
-                         }
-                     },
-                     guests: '$guestInfo.guests',
-                     // Lấy tổng tiền từ payment hoặc tính toán từ phòng
-                     totalPrice: { $ifNull: ['$paymentInfo.amount', { $multiply: ['$room.price', { $ifNull: ['$guestInfo.leaseDuration', 1] }] } ] },
-                     // Lấy mã đơn hàng PayOS
-                     payosOrderCode: '$paymentInfo.orderCode'
-                 }
-             }
-        ]);
-
-        res.status(200).json(bookings); // Trả về mảng bookings đã được "làm giàu"
-
-    } catch (error) {
-        console.error("Error getting user booking history:", error);
-        res.status(500).json({ message: 'Server error' });
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
     }
+
+    console.log(`Getting booking history for user: ${userId}`);
+
+    const bookings = await Booking.aggregate([
+      // 1. Lọc booking của user
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      // 2. Sắp xếp theo mới nhất
+      { $sort: { createdAt: -1 } },
+      // 3. Join với collection 'payments'
+      {
+        $lookup: {
+          from: 'payments',
+          localField: '_id',
+          foreignField: 'bookingId',
+          as: 'paymentDetails'
+        }
+      },
+      // 4. Join với collection 'rooms'
+      {
+        $lookup: {
+          from: 'rooms',
+          localField: 'roomId',
+          foreignField: '_id',
+          as: 'roomDetails'
+        }
+      },
+      // 5. Join với collection 'boardinghouses'
+      {
+        $lookup: {
+          from: 'boardinghouses',
+          localField: 'boardingHouseId',
+          foreignField: '_id',
+          as: 'houseDetails'
+        }
+      },
+      // 6. Lấy object đầu tiên từ mảng join
+      {
+        $project: {
+          _id: 1,
+          contractStatus: 1,
+          status: 1,
+          rejectionReason: 1,
+          createdAt: 1,
+          guestInfo: 1,
+          room: { $arrayElemAt: ['$roomDetails', 0] },
+          boardingHouse: { $arrayElemAt: ['$houseDetails', 0] },
+          paymentInfo: { $arrayElemAt: ['$paymentDetails', 0] }
+        }
+      },
+      // 7. Thêm các trường tính toán và convert kiểu
+      {
+        $addFields: {
+          checkInDate: '$guestInfo.startDate',
+          checkOutDate: {
+            $cond: {
+              if: { $and: ['$guestInfo.startDate', '$guestInfo.leaseDuration'] },
+              then: {
+                $add: [
+                  { $toDate: '$guestInfo.startDate' }, // convert startDate sang Date
+                  {
+                    $multiply: [
+                      { $toInt: '$guestInfo.leaseDuration' }, // convert leaseDuration sang số
+                      30 * 24 * 60 * 60 * 1000 // 1 tháng = 30 ngày
+                    ]
+                  }
+                ]
+              },
+              else: null
+            }
+          },
+          guests: { $ifNull: ['$guestInfo.guests', 1] },
+          totalPrice: {
+            $ifNull: [
+              { $toDouble: '$paymentInfo.amount' },
+              {
+                $multiply: [
+                  { $toDouble: '$room.price' }, // convert room.price sang số
+                  { $toInt: { $ifNull: ['$guestInfo.leaseDuration', 1] } } // convert leaseDuration
+                ]
+              }
+            ]
+          },
+          payosOrderCode: '$paymentInfo.orderCode'
+        }
+      }
+    ]);
+
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error("Error getting user booking history:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
 };
+
 
 exports.getUserBookingRequest = async (req, res) => {
   try {
@@ -388,21 +404,28 @@ exports.getBookingsByBoardingHouse = async (req, res) => {
 };
 
 exports.requestBooking = async (req, res) => {
-  const { boardingHouseId, roomId } = req.body;
-  const userId = req.user.id; // Lấy từ middleware protect
-  const userName = req.user.name; // SỬA LỖI: Lấy userName từ req.user
+  const { boardingHouseId, roomId, guestInfo } = req.body; // ✅ nhận guestInfo
+  const userId = req.user.id;
+  const userName = req.user.name;
+
+  if (!guestInfo) {
+    return res.status(400).json({ message: 'Thiếu thông tin khách.' });
+  }
 
   try {
-    const room = await Room.findOne({ _id: roomId, boardingHouseId: boardingHouseId });
+    const room = await Room.findOne({ _id: roomId, boardingHouseId });
     if (!room || room.status !== 'Available') {
       return res.status(400).json({ message: 'Phòng không tồn tại hoặc đã được đặt.' });
     }
 
-    // Kiểm tra xem đã có yêu cầu tương tự chưa
     const existingRequest = await Booking.findOne({
-      userId, roomId, boardingHouseId,
-      contractStatus: { $in: ['pending_approval', 'approved', 'payment_pending', 'paid'] }
+      userId,
+      roomId,
+      boardingHouseId,
+      contractStatus: { $in: ['pending_approval', 'approved', 'payment_pending', 'paid'] },
+      status: { $nin: ['cancel', 'cancelled'] }
     });
+
     if (existingRequest) {
       return res.status(400).json({ message: 'Bạn đã có yêu cầu hoặc đã đặt phòng này.' });
     }
@@ -412,25 +435,23 @@ exports.requestBooking = async (req, res) => {
       roomId,
       boardingHouseId,
       contractStatus: 'pending_approval',
+      guestInfo // ✅ lưu guestInfo trực tiếp
     });
 
     const savedBooking = await newBooking.save();
 
-    // Lấy thông tin chủ nhà để gửi thông báo
-    const house = await BoardingHouse.findById(boardingHouseId).select('ownerId name'); // Thêm 'name' để dùng trong message
-
+    // Tạo notification cho chủ nhà
+    const house = await BoardingHouse.findById(boardingHouseId).select('ownerId name');
     if (house && house.ownerId && room) {
       await Notification.create({
-        userId: house.ownerId, // Người nhận là chủ nhà
+        userId: house.ownerId,
         type: 'new_booking_request',
         message: `${userName} vừa gửi yêu cầu đặt phòng ${room.roomNumber} tại ${house.name}.`,
-        link: '/owner/pending-bookings', // Link đến trang duyệt yêu cầu
+        link: '/owner/pending-bookings',
         relatedBookingId: savedBooking._id
       });
-      console.log(`Đã tạo thông báo cho owner ${house.ownerId}`);
-    } else {
-      console.warn("Không thể tạo thông báo: Thiếu thông tin nhà trọ hoặc phòng.");
     }
+
     res.status(201).json({ message: 'Yêu cầu đặt phòng đã được gửi thành công.', booking: savedBooking });
 
   } catch (error) {
@@ -438,6 +459,7 @@ exports.requestBooking = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi gửi yêu cầu.' });
   }
 };
+
 
 exports.getPendingBookings = async (req, res) => {
   try {
@@ -452,6 +474,7 @@ exports.getPendingBookings = async (req, res) => {
       contractStatus: 'pending_approval'
     })
       .populate('userId', 'name email phone') // Lấy thông tin người thuê
+      .populate('boardingHouseId', 'name location') // Lấy thông tin nhà trọ
       .populate('roomId', 'roomNumber price area') // Lấy thông tin phòng
       .sort({ createdAt: -1 });
 
@@ -526,7 +549,7 @@ exports.cancelBookingRequest = async (req, res) => {
       },
       {
         // Chỉ cập nhật trường này
-        status:'cancel',
+        status: 'cancel',
         contractStatus: 'cancelled_by_tenant'
       },
       { new: true } // Trả về document đã được cập nhật
@@ -588,55 +611,38 @@ exports.checkOutBooking = async (req, res) => {
   }
 };
 
-exports.getOwnerBookings = async (req, res) => {
+exports.signContract = async (req, res) => {
   try {
-    const ownerId = req.user.id; // lấy id owner từ authMiddleware
-    const { limit = 50 } = req.query; // giới hạn mặc định 50 bookings
+    const { bookingId } = req.params;
+    const { signatureImageBase64 } = req.body;
 
-    // 🔹 Tìm tất cả nhà trọ của owner
-    const houses = await BoardingHouse.find({ ownerId }).select("_id name location price photos");
-    const houseIds = houses.map(h => h._id);
-
-    if (houseIds.length === 0) {
-      return res.status(200).json({ success: true, bookings: [] });
+    if (!signatureImageBase64) {
+      return res.status(400).json({ message: "Chữ ký không được cung cấp." });
     }
 
-    // 🔹 Lấy tất cả bookings có status = "paid" hoặc contractStatus = "paid" và thuộc các nhà trọ của owner
-    const bookings = await Booking.find({
-      boardingHouseId: { $in: houseIds },
-      $or: [
-        { status: "Paid" },
-        { contractStatus: "paid" } // nếu bạn dùng contractStatus
-      ]
-    })
-      .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .populate("userId", "name email")               // thông tin customer
-      .populate("boardingHouseId", "name photos location price") // thông tin boarding house
-      .populate("roomId", "roomNumber price");       // thông tin phòng
+    const booking = await Booking.findById(bookingId);
 
-    // 🔹 Format dữ liệu để frontend dễ dùng
-    const formattedBookings = bookings.map(b => ({
-      _id: b._id,
-      customer: b.userId ? { _id: b.userId._id, name: b.userId.name, email: b.userId.email } : null,
-      house: b.boardingHouseId ? {
-        _id: b.boardingHouseId._id,
-        name: b.boardingHouseId.name,
-        location: b.boardingHouseId.location,
-        photos: b.boardingHouseId.photos,
-        price: b.boardingHouseId.price
-      } : null,
-      room: b.roomId ? { roomNumber: b.roomId.roomNumber, price: b.roomId.price } : null,
-      amount: b.roomId?.price || 0,
-      status: b.status,
-      contractStatus: b.contractStatus,
-      createdAt: b.createdAt
-    }));
+    if (!booking) {
+      return res.status(404).json({ message: "Booking không tìm thấy." });
+    }
 
-    return res.status(200).json({ success: true, bookings: formattedBookings });
+    // Kiểm tra xem người dùng có quyền ký không (ví dụ: là người tạo booking)
+    // if (booking.userId.toString() !== req.user.id) {
+    //     return res.status(403).json({ message: "Bạn không có quyền ký hợp đồng này." });
+    // }
+
+    // Lưu chữ ký vào booking hoặc tạo một collection Contract riêng
+    // Ví dụ: lưu vào booking
+    booking.tenantSignature = signatureImageBase64;
+    booking.contractSignedDate = new Date();
+    booking.status = 'Contract Signed'; // Cập nhật trạng thái
+
+    await booking.save();
+
+    res.status(200).json({ message: "Hợp đồng đã được ký thành công!", booking });
 
   } catch (error) {
-    console.error("Error getting owner bookings:", error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    console.error("Error in signContract:", error);
+    res.status(500).json({ message: "Lỗi server khi ký hợp đồng.", error: error.message });
   }
 };

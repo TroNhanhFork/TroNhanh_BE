@@ -9,6 +9,7 @@ const Membership = require("../models/Membership");
 const Room = require("../models/Room");
 const PAYOS_SANDBOX_API = "https://api-merchant.payos.vn/v2/payment-requests";
 const PAYOS_PROD_API = "https://api-merchant.payos.vn/v2/payment-requests";
+
 exports.createPaymentUrl = async (req, res) => {
   try {
     const { packageId, userId, bookingId, type } = req.body;
@@ -107,10 +108,9 @@ exports.createPaymentUrl = async (req, res) => {
       user.role === "owner"
         ? process.env.PAYOS_CANCEL_URL_OWNER
         : process.env.PAYOS_CANCEL_URL;
-    const returnUrl = `${baseReturnUrl}&orderCode=${orderCode}&type=${type}${
-      finalBookingId ? `&bookingId=${finalBookingId}` : ""
-    }`;
- const cancelUrl = `${baseCancelUrl}&type=${type}&orderCode=${orderCode}`;
+    const returnUrl = `${baseReturnUrl}&orderCode=${orderCode}&type=${type}${finalBookingId ? `&bookingId=${finalBookingId}` : ""
+      }`;
+    const cancelUrl = `${baseCancelUrl}&type=${type}&orderCode=${orderCode}`;
 
 
     // Signature
@@ -220,6 +220,10 @@ exports.payosReturn = async (req, res) => {
 
 exports.handlePayOSWebhook = async (req, res) => {
   try {
+    console.log("🔔 [Webhook Received] Raw body:", req.body);
+    console.log("🚀 Webhook route triggered!");
+  console.log("Headers:", req.headers);
+  console.log("Body:", req.body?.toString?.() || req.body);
     const isSandbox = process.env.PAYOS_USE_SANDBOX === "true";
 
     // Xác thực signature (bỏ qua Sandbox)
@@ -258,25 +262,31 @@ exports.handlePayOSWebhook = async (req, res) => {
       await payment.save();
       return res.status(200).json({ message: "Payment expired" });
     }
+    const status = data.data.status?.toUpperCase();
+    console.log("Status ", status)
 
-    if (code === "00" || desc?.toLowerCase().includes("success")) {
+    if (code === "00" || status == "PAID" || desc?.toLowerCase().includes("success")) {
       payment.status = "Paid";
       payment.completedAt = new Date();
       await payment.save();
+      console.log("Paymen saved ", status)
 
       // Xử lý booking nếu có
       if (payment.bookingId) {
         const updatedBooking = await Booking.findByIdAndUpdate(
           payment.bookingId,
-          { status: "Paid" },
+          {
+            status: "paid",
+            contractStatus: "paid"
+          },
           { new: true }
         );
-          if (updatedBooking) {
-      // ✅ Cập nhật phòng của booking sang "Booked"
-      await Room.findByIdAndUpdate(updatedBooking.roomId, {
-        status: "Booked",
-        customerId: updatedBooking.userId,
-      });
+        if (updatedBooking) {
+          // ✅ Cập nhật phòng của booking sang "Booked"
+          await Room.findByIdAndUpdate(updatedBooking.roomId, {
+            status: "Booked",
+            customerId: updatedBooking.userId,
+          });
         }
       }
 

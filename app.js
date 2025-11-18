@@ -172,11 +172,10 @@ io.on("connection", (socket) => {
         roomId,
         offer,
       });
-  }
+    }
 
-  // Mark caller as busy and avoid referencing undefined properties.
-  // Use socket.data.userId which is set by the auth middleware above.
-  if (socket.data.userId) busyUsers.add(socket.data.userId);
+    busyUsers.add(socket.userId);
+    io.to(toUserId).emit("webrtc-offer", { fromUserId: socket.userId, offer });
   });
 
   // WebRTC Answer
@@ -252,18 +251,9 @@ io.on("connection", (socket) => {
   //   }
   // });
 
-  socket.on("end-call", ({ toUserId, roomId }) => {
-    // Remove caller from busy set
-    if (socket.data.userId) busyUsers.delete(socket.data.userId);
-
-    if (toUserId) {
-      const targetSocket = onlineUsers.get(toUserId);
-      if (targetSocket) {
-        io.to(targetSocket).emit("end-call", { fromUserId: socket.data.userId });
-      }
-    } else if (roomId) {
-      socket.to(`room:${roomId}`).emit("end-call", { fromUserId: socket.data.userId, roomId });
-    }
+  socket.on("end-call", ({ toUserId }) => {
+    busyUsers.delete(socket.userId);
+    io.to(toUserId).emit("end-call", { fromUserId: socket.userId });
   });
 
   // ping/pong
@@ -290,7 +280,12 @@ app.get("/api/payment/webhook", (req, res) => {
   console.log("!!!!!!!!!! BẮT ĐƯỢC REQUEST GET XÁC THỰC !!!!!!!!!!");
   res.status(200).json({ message: "DEBUG SUCCESS: GET request received!" });
 });
-app.post("/api/payment/webhook", express.raw({ type: "application/json" }), handlePayOSWebhook);
+app.post("/api/payment/webhook",  express.raw({ type: "application/json" }), handlePayOSWebhook);
+// app.post("/api/payment/webhook", express.raw({ type: "application/json" }), (req, res, next) => {
+//   console.log("📥 Webhook route HIT!");
+//   next();
+// }, handlePayOSWebhook);
+
 // Dành cho PayOS gửi dữ liệu thanh toán
 // app.post("/api/payment/webhook", express.raw({ type: "application/json" }), async (req, res) => { // Thêm async ở đây
 //     console.log("!!!!!!!!!! BẮT ĐƯỢC REQUEST WEBHOOK !!!!!!!!!!");

@@ -1,0 +1,157 @@
+[
+  {
+    "_id": { "$oid": "656000000000000000000201" },
+    "userId": { "$oid": "660000000000000000000003" },
+    "boardingHouseId": { "$oid": "654000000000000000000001" },
+    "roomId": { "$oid": "655000000000000000000011" },
+    "guestInfo": {
+      "firstName": "Nguyen",
+      "lastName": "An",
+      "email": "nguyen.an@example.com",
+      "phone": "0909000001",
+      "purpose": "Temporary stay",
+      "startDate": { "$date": "2025-11-01T00:00:00Z" },
+      "leaseDuration": "6 months",
+      "guests": 1
+    },
+    "status": "pending",
+    "paymentInfo": {},
+    "expiresAt": { "$date": "2025-11-10T00:00:00Z" },
+    "contractStatus": "pending_approval",
+    "rejectionReason": "",
+    "createdAt": { "$date": "2025-10-25T09:00:00Z" }
+  },
+
+  {
+    "_id": { "$oid": "656000000000000000000202" },
+    "userId": { "$oid": "660000000000000000000004" },
+    "boardingHouseId": { "$oid": "654000000000000000000001" },
+    "roomId": { "$oid": "655000000000000000000012" },
+    "guestInfo": {
+      "firstName": "Tran",
+      "lastName": "Binh",
+      "email": "tran.binh@example.com",
+      "phone": "0909000002",
+      "purpose": "Work assignment",
+      "startDate": { "$date": "2025-10-15T00:00:00Z" },
+      "leaseDuration": "3 months",
+      "guests": 1
+    },
+    "status": "pending",
+    "paymentInfo": {
+      "method": "vnpay",
+      "transactionId": "TXN-20251005-001",
+      "amount": 3000000,
+      "paidAt": { "$date": "2025-10-05T09:05:00Z" }
+    },
+    "expiresAt": null,
+    "contractStatus": "payment_pending",
+    "rejectionReason": "",
+    "createdAt": { "$date": "2025-10-05T09:00:00Z" }
+  },
+
+  {
+    "_id": { "$oid": "656000000000000000000203" },
+    "userId": { "$oid": "660000000000000000000001" },
+    "boardingHouseId": { "$oid": "654000000000000000000002" },
+    "roomId": { "$oid": "655000000000000000000013" },
+    "guestInfo": {
+      "firstName": "Le",
+      "lastName": "Cuong",
+      "email": "le.cuong@example.com",
+      "phone": "0909000003",
+      "purpose": "Study",
+      "startDate": { "$date": "2025-09-20T00:00:00Z" },
+      "leaseDuration": "12 months",
+      "guests": 1
+    },
+    "status": "paid",
+    "paymentInfo": {
+      "method": "stripe",
+      "transactionId": "STR-20250920-900",
+      "amount": 1800000,
+      "paidAt": { "$date": "2025-09-20T10:00:00Z" }
+    },
+    "expiresAt": null,
+    "contractStatus": "paid",
+    "approvedAt": { "$date": "2025-09-20T10:05:00Z" },
+    "rejectionReason": "",
+    "createdAt": { "$date": "2025-09-20T09:45:00Z" }
+  },
+
+  {
+    "_id": { "$oid": "656000000000000000000204" },
+    "userId": { "$oid": "660000000000000000000002" },
+    "boardingHouseId": { "$oid": "654000000000000000000003" },
+    "roomId": { "$oid": "655000000000000000000014" },
+    "guestInfo": {
+      "firstName": "Pham",
+      "lastName": "Hoa",
+      "email": "pham.hoa@example.com",
+      "phone": "0909000004",
+      "purpose": "Relocation",
+      "startDate": { "$date": "2025-08-25T00:00:00Z" },
+      "leaseDuration": "1 month",
+      "guests": 2
+    },
+    "status": "completed",
+    "paymentInfo": {
+      "method": "vnpay",
+      "transactionId": "TXN-20250825-450",
+      "amount": 2500000,
+      "paidAt": { "$date": "2025-08-25T11:00:00Z" }
+    },
+    "expiresAt": null,
+    "contractStatus": "completed",
+    "approvedAt": { "$date": "2025-08-25T11:05:00Z" },
+    "createdAt": { "$date": "2025-08-20T08:30:00Z" }
+  },
+
+  {
+    "_id": { "$oid": "656000000000000000000205" },
+    "userId": { "$oid": "660000000000000000000005" },
+    "boardingHouseId": { "$oid": "654000000000000000000001" },
+    "roomId": { "$oid": "655000000000000000000015" },
+    "guestInfo": {
+      "firstName": "Hoang",
+      "lastName": "Minh",
+      "email": "hoang.minh@example.com",
+      "phone": "0909000005",
+      "purpose": "Temporary",
+      "startDate": { "$date": "2025-10-15T00:00:00Z" },
+      "leaseDuration": "2 months",
+      "guests": 1
+    },
+    "status": "cancelled",
+    "paymentInfo": {},
+    "expiresAt": null,
+    "contractStatus": "cancelled_by_tenant",
+    "rejectionReason": "",
+    "rejectedAt": { "$date": "2025-10-12T12:00:00Z" },
+    "createdAt": { "$date": "2025-10-10T07:20:00Z" }
+  },
+
+  {
+    "_id": { "$oid": "656000000000000000000206" },
+    "userId": { "$oid": "660000000000000000000006" },
+    "boardingHouseId": { "$oid": "654000000000000000000002" },
+    "roomId": { "$oid": "655000000000000000000013" },
+    "guestInfo": {
+      "firstName": "Dang",
+      "lastName": "Lan",
+      "email": "dang.lan@example.com",
+      "phone": "0909000006",
+      "purpose": "Visit",
+      "startDate": { "$date": "2025-09-05T00:00:00Z" },
+      "leaseDuration": "1 month",
+      "guests": 1
+    },
+    "status": "rejected",
+    "paymentInfo": {},
+    "expiresAt": null,
+    "contractStatus": "rejected",
+    "rejectionReason": "Owner rejected due to inspection failure",
+    "rejectedAt": { "$date": "2025-09-03T15:30:00Z" },
+    "createdAt": { "$date": "2025-09-01T10:00:00Z" }
+  }
+]

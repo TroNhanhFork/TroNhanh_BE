@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/authMiddleWare');
+const authMiddleware = require('../middleware/authMiddleware');
 const {updateUserInfoValidator} = require('../middleware/authValidator');
 const profileController = require('../controllers/profileController');
 const favoriteController = require('../controllers/favoriteController');
@@ -10,6 +10,7 @@ router.use(authMiddleware);
 
 // ===== Personal Info =====
 router.get('/personal-info', profileController.getProfileInfo);
+router.put('/change-password', profileController.changePassword);
 
 // ===== Favourites =====
 router.get('/favorites', favoriteController.getUserFavorites);

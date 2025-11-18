@@ -33,4 +33,4 @@ const MemberShipSchema = new mongoose.Schema({
     }
 })
 
-module.exports = mongoose.models.MemberShip || mongoose.model("MemberShip", MemberShipSchema);
+module.exports = mongoose.model('MemberShip', MemberShipSchema)

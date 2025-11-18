@@ -11,7 +11,7 @@ router.get("/", boardingHouseController.getAllBoardingHouses);
 router.get("/searchBoardingHouse", searchAc.SearchBoardingHouseNoUsingAI);
 router.get("/:id", boardingHouseController.getBoardingHouseById);
 
-
+router.get("/booking/:bookingId/details", boardingHouseController.getBoardingHouseDetailsByBooking);
 
 router.post(
   "/:id/reviews",
@@ -33,8 +33,24 @@ router.delete(
 router.delete("/:id", boardingHouseController.deleteBoardingHouse);
 
 
-router.post("/", uploadAccommodation.array("photos", 10), boardingHouseController.createBoardingHouse);
-router.put("/:id", uploadAccommodation.array("photos", 10), boardingHouseController.updateBoardingHouse);
+router.post(
+  "/",
+  uploadAccommodation.fields([
+    { name: "photos", maxCount: 10 },
+    { name: "files", maxCount: 50 },
+  ]),
+  boardingHouseController.createBoardingHouse
+);
+
+router.put(
+  "/:id",
+  uploadAccommodation.fields([
+    { name: "photos", maxCount: 10 },
+    { name: "files", maxCount: 50 },
+  ]),
+  boardingHouseController.updateBoardingHouse
+);
+
 
 // Owner rating routes
 router.get("/owner/ratings", authMiddleware, boardingHouseController.getOwnerBoardingHousesWithRatings);

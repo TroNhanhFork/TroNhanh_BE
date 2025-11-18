@@ -1,0 +1,32 @@
+[
+  {
+    "_id": { "$oid": "657000000000000000000301" },
+    "bookingId": { "$oid": "656000000000000000000301" },
+    "ownerId": { "$oid": "651000000000000000000001" },
+    "amount": 3000000,
+    "status": "Paid",
+    "method": "vnpay",
+    "transactionId": "TXN-20251002-001",
+    "createdAt": { "$date": "2025-10-02T14:05:00Z" }
+  },
+  {
+    "_id": { "$oid": "657000000000000000000302" },
+    "bookingId": { "$oid": "656000000000000000000302" },
+    "ownerId": { "$oid": "651000000000000000000002" },
+    "amount": 2500000,
+    "status": "Paid",
+    "method": "vnpay",
+    "transactionId": "TXN-20250825-450",
+    "createdAt": { "$date": "2025-08-25T11:00:00Z" }
+  },
+  {
+    "_id": { "$oid": "657000000000000000000303" },
+    "bookingId": { "$oid": "656000000000000000000304" },
+    "ownerId": { "$oid": "651000000000000000000001" },
+    "amount": 1800000,
+    "status": "Paid",
+    "method": "stripe",
+    "transactionId": "STR-20250920-900",
+    "createdAt": { "$date": "2025-09-20T10:00:00Z" }
+  }
+]

@@ -23,7 +23,17 @@ const Booking = require('../models/Booking');
 exports.addRoomsToBoardingHouse = async (req, res) => {
     try {
         const { boardingHouseId } = req.params;
-        const roomsData = req.body.rooms; // Mong đợi một mảng các phòng trong body: { rooms: [...] }
+        // rooms can be sent as JSON string in multipart/form-data or as JSON body
+        let roomsData = req.body.rooms;
+        if (!roomsData) roomsData = req.body.roomsData;
+        if (typeof roomsData === 'string') {
+            try { roomsData = JSON.parse(roomsData); } catch (e) { /* leave as is */ }
+        }
+        // photosMap (optional) maps room identifiers (roomNumber or tempId) to array of original filenames
+        let photosMap = req.body.photosMap;
+        if (typeof photosMap === 'string') {
+            try { photosMap = JSON.parse(photosMap); } catch (e) { photosMap = null; }
+        }
 
         if (!Array.isArray(roomsData) || roomsData.length === 0) {
             return res.status(400).json({ message: "Dữ liệu phòng không hợp lệ. Vui lòng cung cấp một mảng các phòng." });
@@ -41,10 +51,35 @@ exports.addRoomsToBoardingHouse = async (req, res) => {
         }
 
         // 2. Chuẩn bị dữ liệu phòng mới và liên kết với nhà trọ
-        const newRooms = roomsData.map(room => ({
-            ...room,
-            boardingHouseId: boardingHouseId, // Gán ID nhà trọ cho mỗi phòng
-        }));
+        const uploadedFiles = req.files || [];
+
+        const filePathBase = "/uploads/accommodation/";
+
+        const newRooms = roomsData.map(room => {
+            // room may include a key to match photosMap, e.g., roomNumber or tempId
+            const key = room.tempId || room.roomNumber || '';
+            const roomPhotos = [];
+            if (photosMap && key && photosMap[key] && Array.isArray(photosMap[key])) {
+                photosMap[key].forEach(fname => {
+                    // Find uploaded file with originalname == fname
+                    const f = uploadedFiles.find(u => u.originalname === fname);
+                    if (f) roomPhotos.push(filePathBase + f.filename);
+                });
+            } else {
+                // Fallback: include any uploaded files that include the roomNumber in their originalname
+                uploadedFiles.forEach(u => {
+                    if (room.roomNumber && u.originalname.includes(String(room.roomNumber))) {
+                        roomPhotos.push(filePathBase + u.filename);
+                    }
+                });
+            }
+
+            return {
+                ...room,
+                boardingHouseId: boardingHouseId, // Gán ID nhà trọ cho mỗi phòng
+                photos: roomPhotos,
+            };
+        });
 
         // 3. Lưu các phòng mới vào database
         const createdRooms = await Room.insertMany(newRooms);
@@ -193,5 +228,38 @@ exports.getAllRoomsByBoardingHouse = async (req, res) => {
     } catch (err) {
         console.error("[GET ALL ROOMS BY HOUSE ERROR]", err);
         res.status(500).json({ message: "Lỗi máy chủ." });
+    }
+};
+
+/**
+ * @description Append photos to an existing room
+ * @route POST /api/rooms/:id/photos
+ */
+exports.addRoomPhotos = async (req, res) => {
+    try {
+        const roomId = req.params.id;
+        const files = req.files || [];
+
+        const room = await Room.findById(roomId);
+        if (!room) return res.status(404).json({ message: 'Room not found' });
+
+        const boardingHouse = await BoardingHouse.findById(room.boardingHouseId);
+        if (!boardingHouse) return res.status(404).json({ message: 'Boarding house not found' });
+
+        // Only owner can append photos
+        if (String(boardingHouse.ownerId) !== String(req.user.id)) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        const filePathBase = '/uploads/accommodation/';
+        const newPaths = files.map(f => filePathBase + f.filename);
+
+        room.photos = Array.isArray(room.photos) ? room.photos.concat(newPaths) : newPaths;
+        await room.save();
+
+        res.status(200).json({ message: 'Added photos to room', data: room });
+    } catch (err) {
+        console.error('[ADD ROOM PHOTOS ERROR]', err);
+        res.status(500).json({ message: 'Server error' });
     }
 };

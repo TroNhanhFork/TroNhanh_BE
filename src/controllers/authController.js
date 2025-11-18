@@ -3,9 +3,10 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const dotenv = require("dotenv");
+dotenv.config();
+
 const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.CLIENT_ID);
-dotenv.config();
 
 const UserOTP = require("../models/UserOTP");
 const generateAccessToken = (user) => {

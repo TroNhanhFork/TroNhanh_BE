@@ -1,0 +1,68 @@
+[
+  {
+    "_id": { "$oid": "654000000000000000000001" },
+    "ownerId": { "$oid": "68f0db162349005a2d9316a7" },
+    "name": "Nhà trọ Xanh Mát",
+    "description": "Nhà trọ sạch sẽ, gần chợ và trường học. Internet tốc độ cao, có chỗ để xe.",
+    "location": {
+      "street": "Đường A",
+      "district": "Quận 1",
+      "addressDetail": "Số 123, ngõ 4",
+      "lat": 16.0645,
+      "lng": 108.2210
+    },
+    "amenities": ["WiFi", "Điều hòa", "Nóng lạnh", "Bảo vệ 24/7"],
+    "photos": [
+      "/uploads/accommodation/nhatro_xanh_1.jpg",
+      "/uploads/accommodation/nhatro_xanh_2.jpg",
+      "/uploads/accommodation/nhatro_xanh_3.jpg"
+    ],
+    "price": 3000000,
+    "approvedStatus": "approved",
+    "createdAt": { "$date": "2025-10-01T08:00:00Z" },
+    "updatedAt": { "$date": "2025-10-05T08:00:00Z" }
+  },
+  {
+    "_id": { "$oid": "654000000000000000000002" },
+    "ownerId": { "$oid": "68f0db162349005a2d9316a7" },
+    "name": "Ký túc xá X",
+    "description": "Phù hợp sinh viên, giá rẻ, có bếp chung.",
+    "location": {
+      "street": "Đường B",
+      "district": "Quận 2",
+      "addressDetail": "Số 45, gần trường Y",
+      "lat": 16.0745,
+      "lng": 108.2310
+    },
+    "amenities": ["Bếp chung", "WiFi"],
+    "photos": [
+      "/uploads/accommodation/ktx_x_1.jpg"
+    ],
+    "price": 1800000,
+    "approvedStatus": "approved",
+    "createdAt": { "$date": "2025-09-15T08:00:00Z" },
+    "updatedAt": { "$date": "2025-09-20T08:00:00Z" }
+  },
+  {
+    "_id": { "$oid": "654000000000000000000003" },
+    "ownerId": { "$oid": "68f0db162349005a2d9316a7" },
+    "name": "Nhà trọ Sạch Đẹp",
+    "description": "Phòng mới xây, có ban công, an ninh tốt.",
+    "location": {
+      "street": "Đường C",
+      "district": "Quận 3",
+      "addressDetail": "Số 77",
+      "lat": 16.0845,
+      "lng": 108.2410
+    },
+    "amenities": ["Ban công", "Máy giặt", "WiFi"],
+    "photos": [
+      "/uploads/accommodation/nhatro_sach_1.jpg",
+      "/uploads/accommodation/nhatro_sach_2.jpg"
+    ],
+    "price": 2500000,
+    "approvedStatus": "approved",
+    "createdAt": { "$date": "2025-08-20T08:00:00Z" },
+    "updatedAt": { "$date": "2025-09-01T08:00:00Z" }
+  }
+]

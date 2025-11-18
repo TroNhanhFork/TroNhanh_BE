@@ -2,14 +2,19 @@ const mongoose = require('mongoose')
 
 const reviewSchema = new mongoose.Schema(
   {
-     boardingHouseId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'BoardingHouse', 
-    required: true
-  },
+    boardingHouseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BoardingHouse',
+      required: true
+    },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: true
+    },
+    roomId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Room',
       required: true
     },
     user: {
