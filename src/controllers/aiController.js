@@ -109,6 +109,9 @@ Hãy viết mô tả:`;
     res.status(500).json({
       message: error.response?.data?.error?.message || 'Không thể tạo mô tả. Vui lòng thử lại sau.'
     });
+  }
+};
+
 // =========================
 // SENTIMENT ANALYSIS
 // =========================
