@@ -139,22 +139,20 @@ const validateUploadedImages = async (req, res, next) => {
       req.files = newFiles;
     }
 
-    // If all files are flagged and auto-rejected, return error
-    if (flaggedFiles.length > 0 && validatedFiles.length === 0) {
-      const autoRejectedCount = flaggedFiles.filter(f => 
-        shouldAutoReject(f.reason)
-      ).length;
-
-      if (autoRejectedCount > 0) {
-        return res.status(400).json({
-          message: 'Uploaded images contain inappropriate content and were rejected',
-          flaggedCount: flaggedFiles.length,
-          violations: flaggedFiles.map(f => ({
-            filename: f.file.originalname,
-            violations: f.reason
-          }))
-        });
-      }
+    // If any file is flagged and should be auto-rejected, return error
+    const autoRejectedFiles = flaggedFiles.filter(f => shouldAutoReject(f.reason));
+    
+    if (autoRejectedFiles.length > 0) {
+      return res.status(400).json({
+        message: 'One or more uploaded images contain inappropriate content and were rejected',
+        error: 'IMAGE_VALIDATION_FAILED',
+        flaggedCount: flaggedFiles.length,
+        autoRejectedCount: autoRejectedFiles.length,
+        violations: autoRejectedFiles.map(f => ({
+          filename: f.file.originalname,
+          violations: f.reason
+        }))
+      });
     }
 
     // Continue with valid files
@@ -261,18 +259,40 @@ const determineSeverity = (violations) => {
 const shouldAutoReject = (violations) => {
   if (!violations || violations.length === 0) return false;
 
+  // Define likelihood scores for comparison
+  const likelihoodScores = {
+    UNKNOWN: 0,
+    VERY_UNLIKELY: 1,
+    UNLIKELY: 2,
+    POSSIBLE: 3,
+    LIKELY: 4,
+    VERY_LIKELY: 5
+  };
+
   // Auto-reject scenarios:
-  // 1. VERY_LIKELY adult or violence
+  // 1. Adult or violence content is UNLIKELY or higher
   // 2. Forbidden content detected (people, inappropriate items)
-  // 3. LIKELY or higher racy content
-  return violations.some(v => 
+  // 3. Racy content is LIKELY or higher
+  return violations.some(v => {
+    const score = likelihoodScores[v.likelihood] || 0;
+
     // Critical safety violations
-    ((v.category === 'adult' || v.category === 'violence') && v.likelihood === 'VERY_LIKELY') ||
+    if ((v.category === 'adult' || v.category === 'violence') && score >= likelihoodScores.UNLIKELY) {
+      return true;
+    }
+    
     // Forbidden content (people, lingerie, etc.)
-    (v.category === 'inappropriate_content') ||
+    if (v.category === 'inappropriate_content') {
+      return true;
+    }
+    
     // Racy content at LIKELY or higher
-    (v.category === 'racy' && (v.likelihood === 'LIKELY' || v.likelihood === 'VERY_LIKELY'))
-  );
+    if (v.category === 'racy' && score >= likelihoodScores.LIKELY) {
+      return true;
+    }
+
+    return false;
+  });
 };
 
 /**
