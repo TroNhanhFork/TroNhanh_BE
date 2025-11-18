@@ -1,4 +1,4 @@
-const { chatWithAIStreaming } = require("../service/aiService");
+const { chatWithAIStreaming, generateDescriptionFromPrompt } = require("../service/aiService");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const fetch = require("node-fetch");
@@ -239,3 +239,19 @@ exports.getLocation = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.generateContract = async (req, res) => {
+  const { prompt, model } = req.body;
+  if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+    return res.status(400).json({ message: 'Prompt is required' });
+  }
+
+  try {
+    const description = await generateDescriptionFromPrompt(prompt, model);
+    return res.status(200).json({ result: description });
+  } catch (err) {
+    console.error('[AI GENERATE CONTRACT ERROR]', err);
+    return res.status(500).json({ message: 'Lỗi khi tạo hợp đồng bằng AI' });
+  }
+};
+
