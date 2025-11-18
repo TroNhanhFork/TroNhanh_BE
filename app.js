@@ -47,9 +47,16 @@ const server = http.createServer(app);
 const onlineUsers = new Map();
 const busyUsers = new Set();
 
+const allowedOrigins = [
+  "https://tronhanh-fe.onrender.com",              // React Local
+  "http://localhost:5173",              // Vite Local (nếu có dùng)
+  "https://tronhanh-fe.onrender.com",   // Frontend đã Deploy của bạn
+  process.env.FRONTEND_URL              // Biến môi trường (nếu có)
+];
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -60,7 +67,7 @@ const io = new Server(server, {
 // Configure CORS for express to accept requests from the front-end and allow credentials
 // (important when FE sends fetch(..., { credentials: 'include' }))
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));

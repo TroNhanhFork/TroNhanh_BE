@@ -190,7 +190,7 @@ exports.payosReturn = async (req, res) => {
     // Dựa trên thông tin em có, hoặc mặc định
     // Ví dụ: em có thể thêm một param 'type' vào returnUrl lúc tạo
     // Ở đây ta dùng URL cơ sở từ .env
-    let baseFrontendUrl = process.env.PAYOS_RETURN_URL; // Ví dụ: http://localhost:3000/customer/booking-result
+    let baseFrontendUrl = process.env.PAYOS_RETURN_URL; // Ví dụ: https://tronhanh-fe.onrender.com/customer/booking-result
     if (queryParams.userId) {
       const user = await User.findById(queryParams.userId);
       if (user && user.role === "owner") {

@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const visitController = require('../controllers/visitRequestController');
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authMiddleWare');
 
 // @route   POST /api/visit-requests
 // @desc    Khách hàng tạo yêu cầu xem trọ

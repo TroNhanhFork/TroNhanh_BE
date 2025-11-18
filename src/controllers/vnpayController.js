@@ -137,7 +137,7 @@ exports.vnpayReturn = async (req, res) => {
           });
         }
         return res.redirect(
-          `http://localhost:3000/owner/membership-result?success=true&packageId=${packageId}`
+          `https://tronhanh-fe.onrender.com/owner/membership-result?success=true&packageId=${packageId}`
         );
       } else if (type === "booking") {
         // update booking status to paid
@@ -168,7 +168,7 @@ exports.vnpayReturn = async (req, res) => {
           console.log("❌ Không tìm thấy booking sau khi update");
         } console.log("✅ Đã cập nhật trạng thái booking thành paid.");
         return res.redirect(
-          `http://localhost:3000/customer/booking-result?success=true&bookingId=${bookingId}`
+          `https://tronhanh-fe.onrender.com/customer/booking-result?success=true&bookingId=${bookingId}`
         );
       }
     } catch (err) {
@@ -178,12 +178,12 @@ exports.vnpayReturn = async (req, res) => {
     console.log("❌ Callback chữ ký SAI");
     if (type === "membership") {
       return res.redirect(
-        "http://localhost:3000/owner/membership-result?success=false"
+        "https://tronhanh-fe.onrender.com/owner/membership-result?success=false"
       );
     } else if (type === "booking") {
-      return res.redirect("http://localhost:3000/booking-result?success=false");
+      return res.redirect("https://tronhanh-fe.onrender.com/booking-result?success=false");
     } else {
-      return res.redirect("http://localhost:3000/");
+      return res.redirect("https://tronhanh-fe.onrender.com/");
     }
   }
 };
