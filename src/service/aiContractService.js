@@ -41,9 +41,16 @@ async function generateContract({ owner, listingId, ownerPrompt, model }) {
     const listing = listingId ? await BoardingHouse.findById(listingId) : null;
     const prompt = await buildPrompt({ owner, listing, ownerPrompt });
 
-    // Collect streaming chunks
     let text = '';
-    await chatWithAIStreaming(prompt, (chunk) => { text += chunk; }, model);
+    const systemRole = "Bạn là chuyên gia pháp lý và soạn thảo hợp đồng tại Việt Nam.";
+
+    await chatWithAIStreaming(
+        systemRole,                     
+        prompt,                         
+        (chunk) => { text += chunk; },  
+        model                           
+    );
+
     return { text, prompt };
 }
 

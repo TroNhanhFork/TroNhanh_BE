@@ -54,9 +54,12 @@ const chatWithAIStreaming = async (systemPrompt, userMessage, onChunk, model = "
 const generateDescriptionFromPrompt = async (prompt, model = "gemini-2.5-flash") => {
   try {
     let text = "";
-    await chatWithAIStreaming(prompt, (chunk) => {
-      text += chunk;
-    }, model);
+    await chatWithAIStreaming(
+      "Bạn là trợ lý AI chuyên viết nội dung.", 
+      prompt,                                   
+      (chunk) => { text += chunk; },            
+      model                                     
+    );
     return text;
   } catch (err) {
     console.error("Error in generateDescriptionFromPrompt:", err);
